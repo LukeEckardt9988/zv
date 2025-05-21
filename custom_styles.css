@@ -1,0 +1,225 @@
+/* custom_styles.css */
+:root {
+  --bs-primary-rgb: 187, 134, 252; /* Akzentfarbe als Bootstrap Primary (RGB-Format) für Komponenten */
+  --bs-secondary-rgb: 3, 218, 198; /* Sekundäre Akzentfarbe (RGB-Format) */
+  
+  /* Eigene Variablen für direkten Zugriff */
+  --app-accent-color: #bb86fc;
+  --app-secondary-accent-color: #03dac6;
+  --app-surface-color: #1e1e1e;
+  --app-background-color: #121212;
+  --app-border-color: #333;
+  --app-text-color: #ffffff;
+
+  /* Überschreiben von Bootstrap Dark Theme Variablen, falls nötig */
+  --bs-body-bg: var(--app-background-color);
+  --bs-body-color: var(--app-text-color);
+  --bs-tertiary-bg: var(--app-surface-color); /* Für Hintergründe von Cards, etc. */
+  --bs-border-color: var(--app-border-color);
+  --bs-link-color: var(--app-secondary-accent-color);
+  --bs-link-hover-color: lighten(var(--app-secondary-accent-color), 10%);
+}
+
+body {
+  font-family: 'Maven Pro', sans-serif;
+  background: url("EPSa_black_right.jpg") no-repeat center center fixed;
+  background-size: cover;
+  color: var(--app-text-color); 
+}
+
+/* Header (unverändert) */
+.app-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  padding: 0.6rem 1rem;
+  background-color: rgba(10, 10, 10, 0.95);
+  border-bottom: 1px solid var(--app-border-color);
+  position: sticky;
+  top: 0;
+  z-index: 1030; 
+}
+
+.app-header .logo-left img {
+  height: 45px; 
+  width: auto;
+  vertical-align: middle;
+}
+
+.app-header .logo-right img {
+  height: 110px;
+  margin: -20px 0 -20px 0; /* NEU: Margin für vertikale Zentrierung */
+  width: auto;
+  vertical-align: middle;
+}
+
+.app-header .app-title {
+  flex: 1;
+  text-align: center;
+  margin: 0 1rem; 
+  color: var(--app-accent-color);
+  font-size: 1.6em;
+  font-weight: 500;
+}
+
+.app-header .user-info {
+  font-size: 0.85em;
+  color: var(--app-text-color);
+  white-space: nowrap; 
+}
+.app-header .user-info strong {
+  color: var(--app-accent-color);
+  font-weight: 500;
+}
+.app-header .user-info a {
+  color: var(--app-secondary-accent-color);
+  text-decoration: none;
+  margin-left: 0.75rem;
+}
+.app-header .user-info a:hover {
+  text-decoration: underline;
+}
+
+/* Hauptcontainer (unter dem Header) - JETZT MIT 85% BREITE */
+.app-main-content {
+  width: 85%;                        /* NEU: Breite auf 85% der umgebenden container-fluid Breite */
+  max-width: 1900px;                 /* NEU: Eine maximale Breite, um auf sehr großen Bildschirmen nicht zu riesig zu werden */
+  margin-left: auto;                 /* NEU: Zentrierung */
+  margin-right: auto;                /* NEU: Zentrierung */
+  
+  background-color: rgba(20, 20, 20, 0.88); 
+  padding: 1.5rem;
+  /* margin-top: 1rem; wird vom .container-fluid in der PHP-Datei gehandhabt */
+  border-radius: .375rem; 
+  min-height: calc(100vh - 100px); /* Ungefähre Höhe des Headers + Footer, damit der Content den Rest füllt */
+}
+
+/* Formularsektionen (unverändert) */
+.form-section {
+  background-color: var(--bs-tertiary-bg);
+  padding: 1.5rem;
+  border-radius: .375rem;
+  margin-bottom: 1.5rem;
+  border: 1px solid var(--app-border-color);
+}
+.form-section h3 {
+  color: var(--app-accent-color);
+  border-bottom: 1px solid var(--app-border-color);
+  padding-bottom: 0.75rem;
+  margin-bottom: 1rem;
+  font-size: 1.25rem;
+  font-weight: 500;
+}
+
+/* Tabellen (unverändert) */
+.table { 
+  font-size: 0.875em; 
+}
+.table thead th {
+  position: sticky;
+  top: 0; 
+  z-index: 10;
+  white-space: nowrap; 
+}
+.table-responsive-custom-height {
+  max-height: 380px; 
+  overflow-y: auto;
+  border: 1px solid var(--app-border-color);
+  border-radius: .25rem;
+}
+.table td a .bi { 
+  vertical-align: -0.1em; 
+  font-size: 1.1em; 
+}
+.table td a .bi-pencil-square { color: var(--bs-warning); }
+.table td a .bi-trash { color: var(--bs-danger); }
+
+
+/* Authentifizierungs-Container (unverändert - behält seine feste max-width) */
+.auth-container {
+  max-width: 480px; 
+  margin: 3rem auto; 
+  background-color: var(--bs-tertiary-bg);
+  padding: 2rem;
+  border-radius: .375rem;
+  border: 1px solid var(--app-border-color);
+}
+.auth-container .auth-title {
+  text-align: center;
+  color: var(--app-accent-color);
+  margin-bottom: 1.5rem;
+  font-size: 1.75rem;
+  font-weight: 500;
+}
+.auth-links {
+  text-align: center;
+  margin-top: 1rem;
+}
+.auth-links a {
+  font-size: 0.9em;
+}
+
+/* Nachrichten-Styles (unverändert) */
+.app-message {
+  padding: 1rem;
+  margin-bottom: 1rem;
+  border-radius: .25rem;
+  border: 1px solid transparent;
+}
+.app-message-success {
+  color: var(--bs-success-text-emphasis);
+  background-color: var(--bs-success-bg-subtle);
+  border-color: var(--bs-success-border-subtle);
+}
+.app-message-error {
+  color: var(--bs-danger-text-emphasis);
+  background-color: var(--bs-danger-bg-subtle);
+  border-color: var(--bs-danger-border-subtle);
+}
+
+/* Hilfsklassen (unverändert) */
+.font-maven { font-family: 'Maven Pro', sans-serif; }
+
+
+/* custom_styles.css */
+.index-select.status-not-received {
+    color: orange !important; /* Wichtig für Bootstrap-Überschreibung */
+    /* Optional: ein spezifischerer Look für das nicht ausgewählte Dropdown */
+    /* border-color: orange; */
+}
+
+.index-select.status-not-received option {
+    color: initial; /* Stellt sicher, dass die Optionen im Dropdown-Menü selbst nicht orange sind */
+}
+
+.index-select.status-received {
+    color: inherit; /* Setzt auf die normale Textfarbe zurück */
+}
+
+/* custom_styles.css */
+.index-wert-nicht-erhalten {
+    color: orange;
+    font-weight: bold; /* Optional, um es hervorzuheben */
+}
+.index-wert-erhalten {
+   
+}
+
+
+/* NEU: Styling für die gesamte Tabellenzeile, wenn Zeichnung nicht global erhalten */
+tr.status-record-not-received td {
+    background-color: rgba(255, 230, 0, 0.466) !important; /* Sehr heller, transparenter Orangeton */
+}
+
+/* Optional: Verhalten beim Hovern über diese Zeilen anpassen */
+.table-hover > tbody > tr.status-record-not-received:hover > td {
+    background-color: rgba(255, 230, 0, 0.349) !important; /* Etwas intensiverer Orangeton beim Hovern */
+}
+
+.hiddencheckbox{
+  display: none;
+}
+#index_status_new_1{
+  display: none;
+}
