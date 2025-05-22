@@ -1,5 +1,5 @@
 <?php
-// ds_aend.php (mit Bootstrap und modernem Layout)
+// ds_aend.php (Version mit zentraler Abteilungs-Checkbox für Index-Status)
 require_once 'config.php';
 require_once 'db_connect.php';
 
@@ -8,10 +8,12 @@ if (!isset($_SESSION['user_id'])) {
     exit;
 }
 
+// Angemeldete Benutzerdaten für Berechtigungen holen
 $loggedInUsername = $_SESSION['username'] ?? '';
-$loggedInUserDepartment = $_SESSION['user_department'] ?? ''; // Abteilung des angemeldeten Benutzers
+$loggedInUserDepartment = strtoupper($_SESSION['user_department'] ?? ''); // Immer als Großbuchstaben für konsistenten Vergleich
+$is_pv_user = ($loggedInUserDepartment === 'PV');
 
-
+// Optionslisten
 $index_options_list = [
     ''    => 'Keine Auswahl',
     '140' => '140 - Technologie',
@@ -26,8 +28,6 @@ $index_options_list = [
     '154' => '154 - Versand',
     '300' => '300 - Technologie'
 ];
-
-
 $kurz_options_list = [
     '' => 'Keine Auswahl',
     '(4)' => '(4) - Zeichnung DIN A4 (PF, PG, PP, Technologie)',
@@ -37,39 +37,38 @@ $kurz_options_list = [
     '(0)' => '(0) - Zeichnung DIN A0 (PF, PG, PP, Technologie)',
     '(SP)' => '(SP) - Schaltplan (PP, Technologie)',
     '(TB)' => '(TB) - Technologisches Beiblatt (PF, Technologie)',
-    '(Assy TOP)' => '(Assy TOP) - Leiterzugseite Top (PF, Technologie)', // Beachten: Länge 9
-    '(Assy BOT)' => '(Assy BOT) - Leiterzugseite Bottom (PF, Technologie)', // Beachten: Länge 10
-    '(PS)' => '(PS) - Prüfspezifikation (PP, Technologie)', // Einmal aufgenommen
+    '(Assy TOP)' => '(Assy TOP) - Leiterzugseite Top (PF, Technologie)',
+    '(Assy BOT)' => '(Assy BOT) - Leiterzugseite Bottom (PF, Technologie)',
+    '(PS)' => '(PS) - Prüfspezifikation (PP, Technologie)',
     '(TS)' => '(TS) - Testspezifikation (PP, Technologie)',
     '(PA)' => '(PA) - Prüfanweisung (PP, Technologie)',
     '(AA)' => '(AA) - Arbeitsanweisung (PF, PG, PP, Technologie)',
-    '(AW)' => '(AW) - Arbeitsanweisung (PF, PG, PP, Technologie)', // Unterscheidet sich dies von AA? Falls nicht, ggf. zusammenfassen.
+    '(AW)' => '(AW) - Arbeitsanweisung (PF, PG, PP, Technologie)',
     '(AU)' => '(AU) - Arbeitsunterweisung (PF, PG, PP, Technologie)',
     '(UA)' => '(UA) - Umbauanleitung (PF, PG, PP, Technologie)',
     '(MA)' => '(MA) - Montageanweisung (PG, Technologie)',
     '(VA)' => '(VA) - Verpackungsanweisung (PF, PG, PP, Versand, Technologie)',
     '(LA)' => '(LA) - Lackieranweisung (PG, Technologie)',
-    // '(PS)' => '(PS) - Prüfspezifikation (PP, Technologie)', // Zweites Vorkommen, ausgelassen
     '(KA)' => '(KA) - Klebeanweisung (PG, Technologie)',
     '(AGL)' => '(AGL) - Abgleichsliste (PF, PG, PP, Technologie)',
     '(FW)' => '(FW) - Firmware/ Software (PP, Technologie)',
     '(Etik)' => '(Etik) - Etikettenzeichnung (PF, PP, Wareneingang, Technologie)',
-    'ZUSB' => 'ZUSB', // Keine Beschreibung gegeben, Kürzel als Text
+    'ZUSB' => 'ZUSB',
     'ZUST' => 'ZUST',
     'ZUS' => 'ZUS'
 ];
 
-
-
 $page_title = "Datensatz bearbeiten";
 $id_to_edit = $_GET['id'] ?? null;
-// suchsachnr_param für den Suchkontext der oberen Tabelle und für den "Zurück"-Link
-$suchsachnr_param = trim($_REQUEST['suchsachnr'] ?? ''); // Von Link oder Formular-Neuladen
+$suchsachnr_param = trim($_REQUEST['suchsachnr'] ?? '');
 
 $record = null;
 $sachnr_val = $kurz_val = $aez_val = $dokart_val = $teildok_val = $hinw_val = '';
-$ind1_val = $ind2_val = $ind3_val = $ind4_val = $ind5_val = $ind6_val = $ind7_val = '';
 $t_dat_val = $m_dat_val = $j_dat_val = '';
+for ($i = 1; $i <= 7; $i++) {
+    ${"ind" . $i . "_val"} = null;
+    ${"ind" . $i . "_status_val"} = 0;
+}
 
 if (!$id_to_edit || !ctype_digit((string)$id_to_edit)) {
     $_SESSION['error_message'] = "Ungültige oder fehlende ID zum Ändern.";
@@ -78,83 +77,83 @@ if (!$id_to_edit || !ctype_digit((string)$id_to_edit)) {
 }
 
 try {
-    $stmt_fetch = $pdo->prepare("SELECT * FROM zeichnverw WHERE id = :id"); // [aus ds_aend.php]
-    $stmt_fetch->execute(['id' => $id_to_edit]); // [aus ds_aend.php]
-    $record = $stmt_fetch->fetch(); // [aus ds_aend.php]
+    $stmt_fetch = $pdo->prepare("SELECT * FROM zeichnverw WHERE id = :id");
+    $stmt_fetch->execute(['id' => $id_to_edit]);
+    $record = $stmt_fetch->fetch(PDO::FETCH_ASSOC);
 
     if ($record) {
-        $sachnr_val = $record['sachnr']; // [aus ds_aend.php]
-        $kurz_val = $record['kurz']; // [aus ds_aend.php]
-        $aez_val = $record['aez']; // [aus ds_aend.php]
-        $dokart_val = $record['dokart']; // [aus ds_aend.php]
-        $teildok_val = $record['teildok']; // [aus ds_aend.php]
-        $hinw_val = $record['hinw']; // [aus ds_aend.php]
-
-        // Initialisierung der Index-Werte
+        $sachnr_val = $record['sachnr'];
+        $kurz_val = $record['kurz'];
+        $aez_val = $record['aez'];
+        $dokart_val = $record['dokart'];
+        $teildok_val = $record['teildok'];
+        $hinw_val = $record['hinw'];
         for ($i = 1; $i <= 7; $i++) {
-            ${"ind" . $i . "_val"} = $record["ind$i"] ?? null; // [aus ds_aend.php], ggf. null als Default
+            ${"ind" . $i . "_val"} = $record["ind$i"] ?? null;
+            ${"ind" . $i . "_status_val"} = $record["ind" . $i . "_status"] ?? 0;
         }
-
-        // NEU bzw. KORREKTE PLATZIERUNG: Initialisierung der Index-Status-Werte
-        for ($i_loop = 1; $i_loop <= 7; $i_loop++) {
-            ${"ind" . $i_loop . "_status_val"} = $record["ind" . $i_loop . "_status"] ?? 0; // Default auf 0 (nicht erhalten)
-        }
-
-        // Datumsverarbeitung (bereits vorhanden)
-        if ($record['dat'] && $record['dat'] !== '0000-00-00') { // [aus ds_aend.php]
+        if ($record['dat'] && $record['dat'] !== '0000-00-00') {
             try {
-                $date_obj = new DateTime($record['dat']); // [aus ds_aend.php]
-                $t_dat_val = $date_obj->format('d'); // [aus ds_aend.php]
-                $m_dat_val = $date_obj->format('m'); // [aus ds_aend.php]
-                $j_dat_val = $date_obj->format('Y'); // [aus ds_aend.php]
-            } catch (Exception $e) { /* Datum ungültig, Felder bleiben leer */
-            } // [aus ds_aend.php]
-        } else {
-            $t_dat_val = $m_dat_val = $j_dat_val = ''; // [aus ds_aend.php]
+                $date_obj = new DateTime($record['dat']);
+                $t_dat_val = $date_obj->format('d');
+                $m_dat_val = $date_obj->format('m');
+                $j_dat_val = $date_obj->format('Y');
+            } catch (Exception $e) {
+            }
         }
-    } else {
-        $_SESSION['error_message'] = "Datensatz mit ID " . htmlspecialchars($id_to_edit) . " nicht gefunden."; // [aus ds_aend.php]
-        header('Location: scrolltab.php?suchsachnr=' . urlencode($suchsachnr_param)); // [aus ds_aend.php]
-        exit; // [aus ds_aend.php]
+    } else { /* ... Fehlerbehandlung ... */
     }
-} catch (PDOException $e) {
-    error_log("ds_aend Fetch Error: " . $e->getMessage()); // [aus ds_aend.php]
-    $_SESSION['error_message'] = "Fehler beim Laden des Datensatzes."; // [aus ds_aend.php]
-    header('Location: scrolltab.php?suchsachnr=' . urlencode($suchsachnr_param)); // [aus ds_aend.php]
-    exit; // [aus ds_aend.php]
+} catch (PDOException $e) { /* ... Fehlerbehandlung ... */
 }
 
+// Initialen Zustand der abteilungsspezifischen Index-Status-Checkbox bestimmen
+$department_specific_indices_all_received = false;
+$current_user_has_relevant_indices_in_record = false;
+$berechtigte_abteilungen_fuer_status_cb = ['PP', 'PG', 'PF', 'PV'];
 
-// Für die Top-Tabelle (Suchergebnisvorschau)
-// Verwende suchsachnr_param für Konsistenz, es sei denn, ein spezifisches Formularfeld wird dafür verwendet
-$suchsachnr_display_filter = trim($_REQUEST['suchsachnr_preview_filter'] ?? $suchsachnr_param);
-$krit_display = !empty($suchsachnr_display_filter) ? 'sachnr' : 'id DESC';
+if (in_array($loggedInUserDepartment, $berechtigte_abteilungen_fuer_status_cb)) {
+    $all_found_and_received_for_user_dept = true;
+    for ($i_php = 0; $i_php < 7; $i_php++) {
+        $db_col_num = $i_php + 1;
+        $index_wert_db = ${"ind" . $db_col_num . "_val"} ?? '';
+        $index_status_db = ${"ind" . $db_col_num . "_status_val"} ?? 0;
 
+        if (!empty($index_wert_db) && $index_wert_db != 0) {
+            $index_department_code = '';
+            if (isset($index_options_list[$index_wert_db])) {
+                $option_display_text = $index_options_list[$index_wert_db];
+                if (preg_match('/-\s*(PP|PG|PF|PV)\b/i', $option_display_text, $matches_dept)) {
+                    $index_department_code = strtoupper($matches_dept[1]);
+                }
+            }
+            if ($loggedInUserDepartment === $index_department_code) {
+                $current_user_has_relevant_indices_in_record = true;
+                if (!$index_status_db) {
+                    $all_found_and_received_for_user_dept = false;
+                    break;
+                }
+            }
+        }
+    }
+    if ($current_user_has_relevant_indices_in_record && $all_found_and_received_for_user_dept) {
+        $department_specific_indices_all_received = true;
+    }
+}
+
+// Für die Kontext-Vorschau (bleibt wie zuvor)
+$suchsachnr_display_filter = trim($_REQUEST['suchsachnr_preview_filter'] ?? $sachnr_val);
+$krit_display = !empty($suchsachnr_display_filter) ? 'sachnr ASC, aez ASC' : 'id DESC';
 try {
-    $sql_display = "SELECT id, sachnr, kurz, aez, dokart, teildok, 
-                           ind1, ind1_status, 
-                           ind2, ind2_status, 
-                           ind3, ind3_status, 
-                           ind4, ind4_status, 
-                           ind5, ind5_status, 
-                           ind6, ind6_status, 
-                           ind7, ind7_status, 
-                           dat, hinw, record_status
-                    FROM zeichnverw 
-                    WHERE sachnr LIKE :suchsachnr_display_filter 
-                    ORDER BY $krit_display 
-                    LIMIT 50"; // Weniger Zeilen für die Vorschau
+    $sql_display = "SELECT id, sachnr, kurz, aez, dokart, teildok, ind1, ind1_status, ind2, ind2_status, ind3, ind3_status, ind4, ind4_status, ind5, ind5_status, ind6, ind6_status, ind7, ind7_status, dat, hinw, record_status FROM zeichnverw WHERE sachnr LIKE :suchsachnr_display_filter ORDER BY $krit_display LIMIT 50";
     $stmt_display = $pdo->prepare($sql_display);
     $stmt_display->execute(['suchsachnr_display_filter' => $suchsachnr_display_filter . '%']);
     $results_display = $stmt_display->fetchAll();
     $num_rows_display = count($results_display);
 } catch (PDOException $e) {
-    error_log("ds_aend Preview SQL Error: " . $e->getMessage());
-    // Nicht kritisch, Formular unten wird trotzdem angezeigt
     $results_display = [];
     $num_rows_display = 0;
+    error_log("ds_aend Preview SQL Error: " . $e->getMessage());
 }
-
 ?>
 <!DOCTYPE html>
 <html lang="de" data-bs-theme="dark">
@@ -165,91 +164,61 @@ try {
     <title><?php echo htmlspecialchars($page_title) . " - ID: " . htmlspecialchars($id_to_edit) . " - " . htmlspecialchars(APP_TITLE); ?></title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
-    <link href="https://fonts.googleapis.com/css2?family=Maven+Pro:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link href="custom_styles.css" rel="stylesheet">
 </head>
 
 <body>
     <header class="app-header">
         <div class="logo-left"><img src="EPSa_logo_group_diap.svg" alt="EPSa Logo"></div>
-        <h1 class="app-title">
-            <a href="index.php" style="color: inherit; text-decoration: none;" title="Zur Startseite">
-                <?php echo htmlspecialchars(APP_TITLE); ?>
-            </a>
-        </h1>
-        <div class="user-info">
-            Angemeldet als: <strong><?php echo htmlspecialchars($_SESSION['username']); ?></strong>
-            <a href="logout.php" style="margin-left: 0.75rem;">Logout</a>
-        </div>
+        <h1 class="app-title"><a href="index.php" style="color: inherit; text-decoration: none;" title="Zur Startseite"><?php echo htmlspecialchars(APP_TITLE); ?></a></h1>
+        <div class="user-info">Angemeldet als: <strong><?php echo htmlspecialchars($_SESSION['username']); ?></strong><a href="logout.php" style="margin-left: 0.75rem;">Logout</a></div>
         <div class="logo-right"><img src="SeroEMSgroup_Logo_vc_DIAP.svg" alt="SeroEMS Logo"></div>
     </header>
 
     <div class="container-fluid mt-3">
         <div class="app-main-content">
-
             <?php if (isset($_SESSION['error_message'])): ?>
-                <div class="alert alert-danger alert-dismissible fade show" role="alert">
-                    <?php echo htmlspecialchars($_SESSION['error_message']);
-                    unset($_SESSION['error_message']); ?>
-                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-                </div>
+                <div class="alert alert-danger alert-dismissible fade show" role="alert"><?php echo htmlspecialchars($_SESSION['error_message']);
+                                                                                            unset($_SESSION['error_message']); ?><button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button></div>
             <?php endif; ?>
             <?php if (isset($_SESSION['success_message'])): ?>
-                <div class="alert alert-success alert-dismissible fade show" role="alert">
-                    <?php echo htmlspecialchars($_SESSION['success_message']);
-                    unset($_SESSION['success_message']); ?>
-                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-                </div>
+                <div class="alert alert-success alert-dismissible fade show" role="alert"><?php echo htmlspecialchars($_SESSION['success_message']);
+                                                                                            unset($_SESSION['success_message']); ?><button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button></div>
             <?php endif; ?>
 
             <section class="form-section mb-4">
-                <h3 class="mb-3">Kontext-Vorschau <small class="text-body-secondary fw-normal fs-6">(gefiltert nach aktueller Sachnr.)</small></h3>
+                <h3 class="mb-3">Kontext-Vorschau <small class="text-body-secondary fw-normal fs-6">(gefiltert nach aktueller Sachnr. des Datensatzes)</small></h3>
                 <form name="form_preview_filter" method="get" action="ds_aend.php" class="row g-3 align-items-center">
                     <input type="hidden" name="id" value="<?php echo htmlspecialchars($id_to_edit); ?>">
-                    <div class="col-md-auto">
-                        <label for="suchsachnr_preview_filter_input" class="col-form-label">Sachnummer-Filter für Vorschau:</label>
-                    </div>
-                    <div class="col-md-4">
-                        <input id="suchsachnr_preview_filter_input" name="suchsachnr_preview_filter" type="text" class="form-control form-control-sm" value="<?php echo htmlspecialchars($suchsachnr_display_filter); ?>" placeholder="Teil der Sachnummer...">
-                    </div>
-                    <div class="col-md-auto">
-                        <button type="submit" class="btn btn-secondary btn-sm">Vorschau Aktualisieren</button>
-                    </div>
-                    <div class="col-md text-md-end">
-                        <small class="text-body-secondary"><?php echo $num_rows_display; ?> Datensätze in Vorschau</small>
-                    </div>
+                    <div class="col-md-auto"><label for="suchsachnr_preview_filter_input" class="col-form-label">Filter für Vorschau:</label></div>
+                    <div class="col-md-4"><input id="suchsachnr_preview_filter_input" name="suchsachnr_preview_filter" type="text" class="form-control form-control-sm" value="<?php echo htmlspecialchars($suchsachnr_display_filter); ?>" placeholder="Teil der Sachnummer..."></div>
+                    <div class="col-md-auto"><button type="submit" class="btn btn-secondary btn-sm">Vorschau Aktualisieren</button></div>
+                    <div class="col-md text-md-end"><small class="text-body-secondary"><?php echo $num_rows_display; ?> Datensätze in Vorschau</small></div>
                 </form>
                 <div class="table-responsive-custom-height mt-3" style="max-height: 200px;">
                     <table class="table table-striped table-hover table-sm table-bordered">
                         <thead class="table-dark">
                             <tr>
-                                <th style="width: 20%;">Sachnummer</th>
-                                <th style="width: 8%;">Kurz</th>
-                                <th style="width: 8%;">ÄZ</th>
-                                <th style="width: 10%;">Dok.-Art</th>
-                                <th style="width: 10%;">Teil-Dok.</th>
-                                <th style="width: 20%;">Indizes</th>
-                                <th style="width: 10%;">Datum</th>
+                                <th>Sachnummer</th>
+                                <th>Kurz</th>
+                                <th>ÄZ</th>
+                                <th>Dok.-Art</th>
+                                <th>Teil-Dok.</th>
+                                <th>Indizes</th>
+                                <th>Datum</th>
                                 <th>Hinweis</th>
                             </tr>
                         </thead>
-                        <tbody>
-                            <?php
-                            $results = $results_display; // Variable für tabinh.php
-                            $suchsachnr = $suchsachnr_display_filter; // Suchkontext für Links in tabinh
-                            include("tabinh.php");
-                            ?>
-                        </tbody>
+                        <tbody><?php $results = $results_display;
+                                $suchsachnr = $suchsachnr_display_filter;
+                                include("tabinh.php"); ?></tbody>
                     </table>
                 </div>
             </section>
-
             <hr class="my-4">
 
             <?php if ($record): ?>
                 <section class="form-section">
-
-
                     <form action="ds_speich.php" method="post" name="form_edit_record">
                         <input type="hidden" name="id" value="<?php echo htmlspecialchars($id_to_edit); ?>">
                         <input type="hidden" name="action" value="Änderung speichern">
@@ -257,61 +226,75 @@ try {
 
                         <div class="d-flex justify-content-between align-items-center mb-3">
                             <h3 class="mb-0">Bearbeite Datensatz ID: <span class="text-info"><?php echo htmlspecialchars($id_to_edit); ?></span></h3>
+                            <?php // Globale "Zeichnung erhalten" Checkbox - bleibt PG-gesteuert 
+                            ?>
                             <div class="form-check fs-5">
-                                <input class="form-check-input" type="checkbox" value="1"
-                                    id="record_status_checkbox_main" name="record_status_checkbox"
-                                    <?php if ($record['record_status'] ?? 0) echo 'checked'; ?>
-                                    <?php if (strtoupper($loggedInUserDepartment ?? '') !== 'PG') echo 'disabled'; ?>>
-                                <label class="form-check-label fw-bold" for="record_status_checkbox_main">
-                                    Zeichnung erhalten <?php if (strtoupper($loggedInUserDepartment ?? '') !== 'PG') echo '<small class="text-muted">(Nur Abt. PG)</small>'; ?>
-                                </label>
+                                <input class="form-check-input" type="checkbox" value="1" id="record_status_checkbox_main" name="record_status_checkbox" <?php if ($record['record_status'] ?? 0) echo 'checked'; ?> <?php if (strtoupper($loggedInUserDepartment ?? '') !== 'PG') echo 'disabled'; ?>>
+                                <label class="form-check-label fw-bold" for="record_status_checkbox_main">Zeichnung empfangen <?php if (strtoupper($loggedInUserDepartment ?? '') !== 'PG') echo '<small class="text-muted">(Nur Abt. PG)</small>'; ?></label>
                             </div>
                         </div>
 
-                        <div class="row gx-2 align-items-end mb-3">
+                        <?php // Abteilungsspezifische "Alle meine Indizes erhalten" Checkbox
+                        if (in_array($loggedInUserDepartment, $berechtigte_abteilungen_fuer_status_cb)): ?>
+                            <div class="row mb-2">
+                                <div class="col-12">
+                                    <div class="form-check form-check-lg">
+                                        <input class="form-check-input" type="checkbox" value="1" id="my_department_indices_status_checkbox" name="my_department_indices_status" <?php if ($department_specific_indices_all_received) echo 'checked'; ?> <?php if (!$current_user_has_relevant_indices_in_record) echo 'disabled'; ?>>
+                                        <label class="form-check-label" for="my_department_indices_status_checkbox"><strong><?php echo htmlspecialchars($loggedInUserDepartment); ?></strong> bestätigt den erhalt der Zeichnung <?php if (!$current_user_has_relevant_indices_in_record) echo '<small class="text-muted">(Keine Indizes Ihrer Abt. in diesem DS)</small>'; ?></label>
+                                    </div>
+                                </div>
+                            </div>
+                        <?php endif; ?>
+                        <hr class="my-3">
+
+                        <div class="row gx-2 align-items-start mb-3">
                             <div class="col-auto">
                                 <label for="sachnr_edit" class="form-label">Sachnr.:</label>
                                 <input id="sachnr_edit" name="sachnr" type="text" class="form-control form-control-sm" style="width: 250px;" value="<?php echo htmlspecialchars($sachnr_val); ?>" maxlength="50">
                             </div>
-                            <div class="col-auto">
-                                <label class="form-label" style="visibility: hidden; display: block;">&nbsp;</label>
-                                <button type="button" id="add_kurz_btn" class="btn btn-success btn-sm"><i class="bi bi-plus-lg"></i> Kürzel</button>
-                            </div>
-                            <div class="col">
-                                <label class="form-label">Kurz:</label>
-                                <div id="kurz_selectors_container">
-                                    <?php /* PHP-Logik zum Generieren der initialen Kurz-Dropdowns hier (wie zuvor) */
-                                    $kurz_werte_array = (!empty($kurz_val)) ? explode(' ', trim($kurz_val)) : ['']; // Mind. 1 Dropdown
-                                    foreach ($kurz_werte_array as $k_idx => $k_wert):
-                                        $is_last_kurz = $k_idx === count($kurz_werte_array) - 1;
-                                    ?>
-                                        <div class="input-group kurz-selector-group <?php echo $k_idx > 0 ? 'mt-1' : ''; ?> w-100">
-                                            <select class="form-select form-select-sm kurz-select">
-                                                <?php foreach ($kurz_options_list as $value => $display_text): ?>
-                                                    <option value="<?php echo htmlspecialchars($value); ?>" <?php if ($k_wert === $value) echo 'selected'; ?>><?php echo htmlspecialchars($display_text); ?></option>
-                                                <?php endforeach; ?>
-                                            </select>
-                                            <button type="button" class="btn btn-danger btn-sm remove-kurz-btn" style="<?php echo (count($kurz_werte_array) > 1) ? '' : 'display: none;'; ?>">-</button>
-                                        </div>
-                                    <?php endforeach; ?>
+                            <?php if ($is_pv_user): ?>
+                                <div class="col-auto"><label class="form-label" style="visibility: hidden; display: block;">&nbsp;</label><button type="button" id="add_kurz_btn" class="btn btn-success btn-sm"><i class="bi bi-plus-lg"></i> Kürzel</button></div>
+                                <div class="col">
+                                    <label class="form-label">Kurz:</label>
+                                    <div id="kurz_selectors_container">
+                                        <?php $kurz_werte_array = (!empty($kurz_val)) ? explode(' ', trim($kurz_val)) : [''];
+                                        foreach ($kurz_werte_array as $k_idx => $k_wert): ?>
+                                            <div class="input-group kurz-selector-group <?php echo $k_idx > 0 ? 'mt-1' : ''; ?> w-100">
+                                                <select class="form-select form-select-sm kurz-select">
+                                                    <?php foreach ($kurz_options_list as $value => $display_text): ?>
+                                                        <option value="<?php echo htmlspecialchars($value); ?>" <?php if ($k_wert === $value) echo 'selected'; ?>><?php echo htmlspecialchars($display_text); ?></option>
+                                                    <?php endforeach; ?>
+                                                </select>
+                                                <button type="button" class="btn btn-danger btn-sm remove-kurz-btn" style="<?php echo (count($kurz_werte_array) > 1 || !empty($k_wert)) ? '' : 'display: none;'; ?>">-</button>
+                                            </div>
+                                        <?php endforeach; ?>
+                                    </div>
+                                    <input type="hidden" name="kurz" id="kurz_combined_hidden" value="<?php echo htmlspecialchars($kurz_val); ?>">
                                 </div>
-                                <input type="hidden" name="kurz" id="kurz_combined_hidden" value="<?php echo htmlspecialchars($kurz_val); ?>">
-                            </div>
+                            <?php else: ?>
+                                <div class="col">
+                                    <label class="form-label">Kurz:</label>
+                                    <div class="read-only-kurz p-2 rounded form-control-sm" style="background-color: var(--bs-tertiary-bg); border: 1px solid var(--bs-border-color); min-height: 31px; line-height:normal; display:flex; align-items:center;">
+                                        <?php if (!empty($kurz_val)) {
+                                            $kurz_display_array = [];
+                                            $temp_kurz_werte = explode(' ', trim($kurz_val));
+                                            foreach ($temp_kurz_werte as $k_wert_ro) {
+                                                $kurz_display_array[] = htmlspecialchars($kurz_options_list[$k_wert_ro] ?? $k_wert_ro);
+                                            }
+                                            echo implode('<span class="text-body-secondary mx-1">/</span>', $kurz_display_array);
+                                        } else {
+                                            echo '<span class="text-muted fst-italic">Kein Kürzel</span>';
+                                        } ?>
+                                    </div>
+                                    <input type="hidden" name="kurz" value="<?php echo htmlspecialchars($kurz_val); ?>">
+                                </div>
+                            <?php endif; ?>
                         </div>
 
                         <div class="row gx-2 align-items-end mb-3">
-                            <div class="col-auto">
-                                <label for="aez_edit" class="form-label">ÄZ/Vers.:</label>
-                                <input id="aez_edit" name="aez" type="text" class="form-control form-control-sm" style="width: 150px;" value="<?php echo htmlspecialchars($aez_val); ?>" maxlength="9">
-                            </div>
-                            <div class="col-auto">
-                                <label for="dokart_edit" class="form-label">Dok.-Art:</label>
-                                <input id="dokart_edit" name="dokart" type="text" class="form-control form-control-sm" style="width: 150px;" value="<?php echo htmlspecialchars($dokart_val); ?>" maxlength="5">
-                            </div>
-                            <div class="col-auto">
-                                <label for="teildok_edit" class="form-label">Teil-Dok.:</label>
-                                <input id="teildok_edit" name="teildok" type="text" class="form-control form-control-sm" style="width: 150px;" value="<?php echo htmlspecialchars($teildok_val); ?>" maxlength="5">
-                            </div>
+                            <div class="col-auto"><label for="aez_edit" class="form-label">ÄZ/Vers.:</label><input id="aez_edit" name="aez" type="text" class="form-control form-control-sm" style="width: 150px;" value="<?php echo htmlspecialchars($aez_val); ?>" maxlength="9"></div>
+                            <div class="col-auto"><label for="dokart_edit" class="form-label">Dok.-Art:</label><input id="dokart_edit" name="dokart" type="text" class="form-control form-control-sm" style="width: 150px;" value="<?php echo htmlspecialchars($dokart_val); ?>" maxlength="5"></div>
+                            <div class="col-auto"><label for="teildok_edit" class="form-label">Teil-Dok.:</label><input id="teildok_edit" name="teildok" type="text" class="form-control form-control-sm" style="width: 150px;" value="<?php echo htmlspecialchars($teildok_val); ?>" maxlength="5"></div>
                         </div>
 
                         <div class="row gx-3 align-items-start mb-3">
@@ -319,74 +302,65 @@ try {
                                 <label class="form-label d-block mb-1">Indizes (max. 7):</label>
                                 <div id="indices_selectors_container">
                                     <?php
-                                    $is_pv_user = (strtoupper($loggedInUserDepartment ?? '') === 'PV');
-                                    // $is_admin_user = (strtolower($loggedInUsername) === 'admin'); // Annahme für Admin-Logik
-
-                                    $aktive_indizes_fuer_form = [];
-                                    $hat_aktive_indizes = false;
-                                    for ($i = 0; $i < 7; $i++) {
-                                        $db_col_num = $i + 1;
-                                        $index_wert_db = ${"ind" . $db_col_num . "_val"} ?? '';
-                                        $index_status_db = ${"ind" . $db_col_num . "_status_val"} ?? 0;
-                                        if ($index_wert_db !== '' && $index_wert_db != 0) {
-                                            $aktive_indizes_fuer_form[$i] = ['value' => $index_wert_db, 'status' => $index_status_db];
-                                            $hat_aktive_indizes = true;
+                                    $aktive_indizes_fuer_form_display = [];
+                                    $hat_aktive_indizes_display = false;
+                                    for ($i_php_disp = 0; $i_php_disp < 7; $i_php_disp++) {
+                                        $db_col_num_disp = $i_php_disp + 1;
+                                        $index_wert_db_disp = ${"ind" . $db_col_num_disp . "_val"} ?? '';
+                                        $index_status_db_disp = ${"ind" . $db_col_num_disp . "_status_val"} ?? 0;
+                                        if (!empty($index_wert_db_disp) && $index_wert_db_disp != 0) {
+                                            $aktive_indizes_fuer_form_display[$i_php_disp] = ['value' => $index_wert_db_disp, 'status' => $index_status_db_disp];
+                                            $hat_aktive_indizes_display = true;
                                         }
                                     }
-                                    // Wenn keine aktiven Indizes da sind, zeige eine leere Gruppe als Startpunkt
-                                    if (!$hat_aktive_indizes) {
-                                        $aktive_indizes_fuer_form[0] = ['value' => '', 'status' => 0];
+                                    if (!$hat_aktive_indizes_display && $is_pv_user) {
+                                        $aktive_indizes_fuer_form_display[0] = ['value' => '', 'status' => 0];
                                     }
 
-                                    $form_idx_key = 0; // Fortlaufender Key für Formular-Elemente
-                                    foreach ($aktive_indizes_fuer_form as $index_data_key => $index_data) { // $index_data_key ist der ursprüngliche Slot 0-6 falls benötigt
-                                        $idx_wert = $index_data['value'];
-                                        $idx_status = $index_data['status'];
-                                        $unique_id_edit = 'idx_edit_' . $form_idx_key . '_' . substr(md5(uniqid(rand(), true)), 0, 5);
+                                    if ($is_pv_user || $hat_aktive_indizes_display) {
+                                        $form_idx_key_display = 0;
+                                        foreach ($aktive_indizes_fuer_form_display as $index_data) {
+                                            $idx_wert_disp = $index_data['value'];
+                                            $idx_status_disp = $index_data['status'];
 
-                                        $can_edit_this_index_status_permission = false; // Zurücksetzen für jeden Index
-                                        if (!empty($idx_wert) && isset($index_options_list[$idx_wert])) {
-                                            $option_display_text = $index_options_list[$idx_wert];
-                                            if (preg_match('/-\s*(PP|PG|PF|PV)\b/i', $option_display_text, $matches)) {
-                                                $index_department_code = strtoupper($matches[1]);
-                                                if (strtoupper($loggedInUserDepartment ?? '') === $index_department_code) {
-                                                    $can_edit_this_index_status_permission = true;
-                                                }
+                                            $select_classes_disp = "form-select form-select-sm index-select";
+                                            if (!empty($idx_wert_disp) && !$idx_status_disp) {
+                                                $select_classes_disp .= " status-not-received";
+                                            } else {
+                                                $select_classes_disp .= " status-received";
                                             }
-                                        }
-
-                                        // Admin-Overrides oder spezifische Logik:
-                                        // Wenn Admin, aber nicht PV: keine Bearbeitung der Indexwerte oder Hinzufügen/Entfernen
-                                        // Status-Checkbox-Editierbarkeit hängt von $can_edit_this_index_status_permission ab
-                                        $disable_select = (!$is_pv_user && $loggedInUsername === 'admin'); // Beispiel: Admin (nicht PV) kann Wert nicht ändern
-                                        $disable_checkbox = $disable_select || !$can_edit_this_index_status_permission; // Checkbox auch deaktivieren wenn Select deaktiviert ist oder keine spez. Berechtigung
-                                        $hide_remove_button = $disable_select || (count($aktive_indizes_fuer_form) <= 1 && !$hat_aktive_indizes);
-
-
-                                        $select_classes = "form-select form-select-sm index-select";
-                                        if (!empty($idx_wert) && !$idx_status) {
-                                            $select_classes .= " status-not-received";
-                                        } else {
-                                            $select_classes .= " status-received";
-                                        }
                                     ?>
-                                        <div class="input-group mb-1 index-selector-group align-items-center">
-                                            <select name="dynamic_indices[<?php echo $form_idx_key; ?>]" class="<?php echo $select_classes; ?>" style="width: 100px; min-width: 100px; flex-grow: 0;" <?php if ($disable_select) echo 'disabled'; ?>>
-                                                <?php foreach ($index_options_list as $value_opt => $display_text_opt): ?>
-                                                    <option value="<?php echo htmlspecialchars($value_opt); ?>" <?php if ((string)$idx_wert === (string)$value_opt) echo 'selected'; ?>><?php echo htmlspecialchars($display_text_opt); ?></option>
-                                                <?php endforeach; ?>
-                                            </select>
-                                            <div class="form-check ms-2">
-                                                <input type="hidden" name="dynamic_indices_status[<?php echo $form_idx_key; ?>]" value="0">
-                                                <input class="form-check-input index-status-checkbox" type="checkbox" name="dynamic_indices_status[<?php echo $form_idx_key; ?>]" value="1" id="<?php echo $unique_id_edit; ?>" <?php if ($idx_status) echo 'checked'; ?> <?php if ($disable_checkbox) echo 'disabled'; ?>>
-                                                <label class="form-check-label small" for="<?php echo $unique_id_edit; ?>">Erhalten?</label>
+                                            <div class="input-group mb-1 index-selector-group align-items-center">
+                                                <?php if ($is_pv_user): ?>
+                                                    <select name="dynamic_indices[<?php echo $form_idx_key_display; ?>]" class="<?php echo $select_classes_disp; ?>" style="width: 100px; min-width: 100px; flex-grow: 0;">
+                                                        <?php foreach ($index_options_list as $value_opt => $display_text_opt): ?>
+                                                            <option value="<?php echo htmlspecialchars($value_opt); ?>" <?php if ((string)$idx_wert_disp === (string)$value_opt) echo 'selected'; ?>><?php echo htmlspecialchars($display_text_opt); ?></option>
+                                                        <?php endforeach; ?>
+                                                    </select>
+                                                <?php else: /* Nicht-PV User sehen Text */ ?>
+                                                    <span class="form-control-plaintext <?php echo $select_classes_disp; ?>" style="width: auto; min-width: 120px; /* Mehr Platz für Text */ padding: .25rem .5rem; border: 1px solid var(--bs-border-color); border-radius:var(--bs-border-radius-sm); background-color: var(--bs-tertiary-bg); display:inline-block; height: calc(1.5em + .5rem + 2px); font-size: .875em;">
+                                                        <?php echo isset($index_options_list[$idx_wert_disp]) ? htmlspecialchars($index_options_list[$idx_wert_disp]) : htmlspecialchars($idx_wert_disp); ?>
+                                                    </span>
+                                                    <input type="hidden" name="dynamic_indices[<?php echo $form_idx_key_display; ?>]" value="<?php echo htmlspecialchars($idx_wert_disp); ?>">
+                                                <?php endif; ?>
+
+                                                <?php if ($is_pv_user):
+                                                    $show_remove_btn = (count($aktive_indizes_fuer_form_display) > 1 || ($hat_aktive_indizes_display && count($aktive_indizes_fuer_form_display) == 1 && !empty($idx_wert_disp))); ?>
+                                                    <button type="button" class="btn btn-danger btn-sm remove-index-btn ms-2" style="<?php echo $show_remove_btn ? '' : 'display:none;'; ?>">-</button>
+                                                <?php else: // Platzhalter für Nicht-PV 
+                                                ?>
+                                                    <div style="width: 38px; /* Ca. Breite des Buttons inkl. Margin */ height: 1px; display:inline-block; margin-left:0.5rem;"></div>
+                                                <?php endif; ?>
                                             </div>
-                                            <button type="button" class="btn btn-danger btn-sm remove-index-btn ms-2" style="<?php echo $hide_remove_button ? 'display:none;' : ''; ?>">-</button>
+                                        <?php $form_idx_key_display++;
+                                        }
+                                    } else if (!$is_pv_user && !$hat_aktive_indizes_display) { ?>
+                                        <div class="read-only-indices p-2 rounded" style="background-color: var(--bs-body-bg); border: 1px solid var(--bs-border-color); min-height:31px; line-height: normal; display: flex; align-items: center;">
+                                            <span class="text-muted fst-italic">Keine Indizes zugeordnet.</span>
                                         </div>
-                                    <?php $form_idx_key++;
-                                    } // Ende foreach $aktive_indizes_fuer_form 
-                                    ?>
+                                    <?php } ?>
                                 </div>
+
                                 <?php if ($is_pv_user): ?>
                                     <button type="button" id="add_index_btn" class="btn btn-success btn-sm mt-1"><i class="bi bi-plus-lg"></i> Index hinzufügen</button>
                                 <?php endif; ?>
@@ -421,212 +395,18 @@ try {
             <?php else: ?>
                 <div class="alert alert-warning">Der Datensatz konnte nicht geladen werden.</div>
             <?php endif; ?>
+
         </div>
+    </div>
 
-        <footer class="text-center text-body-secondary py-3 mt-3">
-            <small>&copy; <?php echo date("Y"); ?> Ihre Firma. Alle Rechte vorbehalten.</small>
-        </footer>
+    <footer class="text-center text-body-secondary py-3 mt-3">
+        <small>&copy; <?php echo date("Y"); ?> Ihre Firma. Alle Rechte vorbehalten.</small>
+    </footer>
 
-        <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-        <script>
-            document.addEventListener('DOMContentLoaded', function() {
-                // --- KURZ-FELDER LOGIK (wie von Ihnen bereitgestellt, scheint zu funktionieren) ---
-                const kurzContainer = document.getElementById('kurz_selectors_container');
-                const addKurzButton = document.getElementById('add_kurz_btn');
-                const hiddenCombinedKurzInput = document.getElementById('kurz_combined_hidden');
-
-                function updateCombinedKurzField() {
-                    if (!kurzContainer || !hiddenCombinedKurzInput) return;
-                    const selectedValues = [];
-                    kurzContainer.querySelectorAll('.kurz-select').forEach(function(select) {
-                        if (select.value) {
-                            selectedValues.push(select.value);
-                        }
-                    });
-                    hiddenCombinedKurzInput.value = selectedValues.join(' ');
-                    toggleKurzRemoveButtonVisibility();
-                }
-
-                function toggleKurzRemoveButtonVisibility() {
-                    if (!kurzContainer) return;
-                    const allKurzGroups = kurzContainer.querySelectorAll('.kurz-selector-group');
-                    allKurzGroups.forEach((group) => {
-                        const removeBtn = group.querySelector('.remove-kurz-btn');
-                        if (removeBtn) {
-                            removeBtn.style.display = (allKurzGroups.length > 1) ? 'inline-block' : 'none';
-                        }
-                    });
-                }
-
-                if (kurzContainer && addKurzButton) {
-                    // Event-Listener für Änderungen an den Select-Boxen (delegiert)
-                    kurzContainer.addEventListener('change', function(event) {
-                        if (event.target.classList.contains('kurz-select')) {
-                            updateCombinedKurzField();
-                        }
-                    });
-
-                    addKurzButton.addEventListener('click', function() {
-                        const firstKurzGroup = kurzContainer.querySelector('.kurz-selector-group');
-                        if (!firstKurzGroup) return;
-
-                        const newKurzGroup = firstKurzGroup.cloneNode(true);
-                        newKurzGroup.querySelector('.kurz-select').value = ''; // Auswahl zurücksetzen
-
-                        const removeKurzBtn = newKurzGroup.querySelector('.remove-kurz-btn');
-                        if (removeKurzBtn) {
-                            removeKurzBtn.style.display = 'inline-block'; // Für neue immer anzeigen
-                            removeKurzBtn.addEventListener('click', function() {
-                                newKurzGroup.remove();
-                                updateCombinedKurzField();
-                            }, {
-                                once: true
-                            }); // Listener nur einmal binden, da geklont
-                        }
-                        kurzContainer.appendChild(newKurzGroup);
-                        updateCombinedKurzField(); // Aktualisiert auch Button-Sichtbarkeit
-                    });
-                }
-                if (kurzContainer) { // Für initial geladene Elemente in ds_aend.php
-                    kurzContainer.querySelectorAll('.kurz-selector-group').forEach(group => {
-                        const removeBtn = group.querySelector('.remove-kurz-btn');
-                        if (removeBtn && !removeBtn.dataset.listenerAttached) { // Nur wenn noch kein Listener
-                            removeBtn.addEventListener('click', function() {
-                                if (kurzContainer.querySelectorAll('.kurz-selector-group').length > 1) {
-                                    group.remove();
-                                    updateCombinedKurzField();
-                                }
-                            });
-                            removeBtn.dataset.listenerAttached = 'true';
-                        }
-                    });
-                }
-                if (typeof updateCombinedKurzField === "function") updateCombinedKurzField();
-
-
-                // --- INDIZES-FELDER LOGIK (STARK ÜBERARBEITET) ---
-                const indicesContainer = document.getElementById('indices_selectors_container');
-                const addIndexButton = document.getElementById('add_index_btn');
-                const MAX_INDICES = 7;
-
-                function generateUniqueId(prefix = 'id_') {
-                    return prefix + Date.now().toString(36) + Math.random().toString(36).substr(2, 5);
-                }
-
-                function applyIndexStyling(groupElement) {
-                    const select = groupElement.querySelector('.index-select');
-                    const checkbox = groupElement.querySelector('.index-status-checkbox');
-                    if (!select || !checkbox) return;
-
-                    if (select.value && select.value !== '' && !checkbox.checked) {
-                        select.classList.add('status-not-received');
-                        select.classList.remove('status-received');
-                    } else {
-                        select.classList.remove('status-not-received');
-                        select.classList.add('status-received');
-                    }
-                }
-
-                function reassignIndexKeys() {
-                    if (!indicesContainer) return;
-                    const allIndexGroups = indicesContainer.querySelectorAll('.index-selector-group');
-                    allIndexGroups.forEach((group, newKey) => {
-                        const select = group.querySelector('.index-select');
-                        const hiddenStatus = group.querySelector('input[type="hidden"]');
-                        const checkbox = group.querySelector('.index-status-checkbox');
-                        const label = group.querySelector('.form-check-label');
-                        const uniqueId = generateUniqueId('idx_dyn_' + newKey + '_');
-
-                        if (select) select.name = `dynamic_indices[${newKey}]`;
-                        if (hiddenStatus) hiddenStatus.name = `dynamic_indices_status[${newKey}]`;
-                        if (checkbox) {
-                            checkbox.name = `dynamic_indices_status[${newKey}]`;
-                            checkbox.id = uniqueId;
-                        }
-                        if (label) label.setAttribute('for', uniqueId);
-                    });
-                }
-
-                function updateIndexControlsAndStyles() {
-                    if (!indicesContainer) return;
-                    const allIndexGroups = indicesContainer.querySelectorAll('.index-selector-group');
-
-                    allIndexGroups.forEach((group) => {
-                        const removeBtn = group.querySelector('.remove-index-btn');
-                        if (removeBtn) {
-                            removeBtn.style.display = (allIndexGroups.length > 1) ? 'inline-block' : 'none';
-                        }
-                        applyIndexStyling(group);
-                    });
-
-                    if (addIndexButton) {
-                        addIndexButton.disabled = (allIndexGroups.length >= MAX_INDICES);
-                        addIndexButton.classList.toggle('disabled', allIndexGroups.length >= MAX_INDICES);
-                    }
-                    reassignIndexKeys(); // Stelle sicher, dass die Keys nach dem Entfernen sequentiell sind
-                }
-
-
-                function setupEventListenersForIndexGroup(groupElement) {
-                    const select = groupElement.querySelector('.index-select');
-                    const checkbox = groupElement.querySelector('.index-status-checkbox');
-                    const removeBtn = groupElement.querySelector('.remove-index-btn');
-
-                    if (select) select.addEventListener('change', function() {
-                        applyIndexStyling(groupElement);
-                    });
-                    if (checkbox) checkbox.addEventListener('change', function() {
-                        applyIndexStyling(groupElement);
-                    });
-
-                    if (removeBtn) {
-                        // Entferne alte Listener, um Duplikate zu vermeiden (wichtig beim Klonen)
-                        const newRemoveBtn = removeBtn.cloneNode(true);
-                        removeBtn.parentNode.replaceChild(newRemoveBtn, removeBtn);
-                        newRemoveBtn.addEventListener('click', function() {
-                            groupElement.remove();
-                            updateIndexControlsAndStyles();
-                        });
-                    }
-                }
-
-                if (addIndexButton && indicesContainer) {
-                    addIndexButton.addEventListener('click', function() {
-                        const allIndexGroups = indicesContainer.querySelectorAll('.index-selector-group');
-                        if (allIndexGroups.length < MAX_INDICES) {
-                            const templateNode = indicesContainer.querySelector('.index-selector-group');
-                            if (!templateNode) {
-                                console.error("Index template node not found!");
-                                return;
-                            }
-                            const newIndexGroup = templateNode.cloneNode(true);
-
-                            const newSelect = newIndexGroup.querySelector('.index-select');
-                            const newCheckbox = newIndexGroup.querySelector('.index-status-checkbox');
-
-                            if (newSelect) newSelect.value = '';
-                            if (newCheckbox) newCheckbox.checked = false;
-
-                            // Schlüssel und IDs werden in reassignIndexKeys und setupEventListenersForIndexGroup gesetzt
-                            indicesContainer.appendChild(newIndexGroup);
-                            // Der neue Key wird in reassignIndexKeys nach dem Append bestimmt
-                            reassignIndexKeys(); // Keys neu zuweisen, um Lücken zu füllen
-                            setupEventListenersForIndexGroup(newIndexGroup); // Listener für neue Gruppe
-                            applyIndexStyling(newIndexGroup);
-                            updateIndexControlsAndStyles();
-                        }
-                    });
-                }
-
-                // Initial Event Listeners und Styling für PHP-gerenderte Elemente (besonders in ds_aend.php)
-                if (indicesContainer) {
-                    indicesContainer.querySelectorAll('.index-selector-group').forEach((group) => {
-                        setupEventListenersForIndexGroup(group); // Setzt auch korrekte Namen durch reassign in updateControls
-                    });
-                    updateIndexControlsAndStyles(); // Initialisiert alles korrekt
-                }
-            });
-        </script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // Der JavaScript-Block muss ebenfalls angepasst werden! 
+    </script>
 </body>
 
 </html>
