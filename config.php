@@ -3,10 +3,10 @@
 
 // ** Datenbankeinstellungen **
 // Ersetzen Sie diese Werte mit Ihren tatsächlichen Datenbankzugangsdaten
-define('DB_HOST', 'Ubserv01'); // Ihr Datenbank-Host (z.B. 'localhost' oder IP)
+define('DB_HOST', 'localhost'); // Ihr Datenbank-Host (z.B. 'localhost' oder IP)
 define('DB_NAME', 'p_zv');   // Name Ihrer Datenbank
-define('DB_USER', 'p_zv'); // Ihr Datenbankbenutzer
-define('DB_PASS', 'dxt-ezXJD5QlS6VY'); // Ihr Datenbankpasswort
+define('DB_USER', 'root'); // Ihr Datenbankbenutzer
+define('DB_PASS', ''); // Ihr Datenbankpasswort
 define('DB_CHARSET', 'utf8mb4'); // Zeichensatz für die PDO-Verbindung
 
 // ** Anwendungseinstellungen **

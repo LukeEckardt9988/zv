@@ -47,17 +47,19 @@ try {
 // wenn sie an mehreren Stellen (z.B. auch in ds_aend.php) identisch verwendet werden.
 $index_options_list = [
     ''    => 'Keine Auswahl',
-    '140' => '140 - Technologie',
-    '141' => '141 - PG',
-    '142' => '142 - PG',
+    '140' => '140 - LP-Fertigung',
+    '141' => '141 - PG/Montage',
+    '142' => '142 - PG/Vorfertigung',
+    '143' => '143 - Q',
     '145' => '145 - PP',
     '146' => '146 - PF',
-    '600' => '600 - EK',
-    '241' => '241 - PP',
-    '152' => '152 - PG',
-    '153' => '153 - PG',
-    '154' => '154 - VS',
-    '300' => '300 - Technologie'
+    '152' => '152 - PG/Waschen, Lackieren',
+    '153' => '153 - PG/Verguss',
+    '154' => '154 - Versand',
+    '174' => '174 - A',
+    '175' => '175 - PP/MOPSY',
+    '241' => '241 - PP/Thales',
+    '600' => '600 - E, PA'
 ];
 
 

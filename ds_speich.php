@@ -12,13 +12,28 @@ if (!isset($_SESSION['user_id'])) {
 // --- START: ZENTRALE KONFIGURATION & BERECHTIGUNGEN ---
 $authorized_user_ids = [4, 10, 3];
 $department_map = [
-    'PP' => 'PP', 'PG' => 'PG', 'PF' => 'PF', 'PV' => 'PV',
-    'VS' => 'Versand', 'EK' => 'Einkauf'
+    'PP' => 'PP',
+    'PG' => 'PG',
+    'PF' => 'PF',
+    'PV' => 'PV',
+    'VS' => 'Versand',
+    'EK' => 'Einkauf'
 ];
 $index_options_list = [
-    ''    => 'Keine Auswahl', '140' => '140 - Technologie', '141' => '141 - PG', '142' => '142 - PG',
-    '145' => '145 - PP', '146' => '146 - PF', '600' => '600 - Einkauf', '241' => '241 - PP',
-    '152' => '152 - PG', '153' => '153 - PG', '154' => '154 - Versand', '300' => '300 - Technologie'
+    ''    => 'Keine Auswahl',
+    '140' => '140 - LP-Fertigung',
+    '141' => '141 - PG/Montage',
+    '142' => '142 - PG/Vorfertigung',
+    '143' => '143 - Q',
+    '145' => '145 - PP',
+    '146' => '146 - PF',
+    '152' => '152 - PG/Waschen, Lackieren',
+    '153' => '153 - PG/Verguss',
+    '154' => '154 - Versand',
+    '174' => '174 - A',
+    '175' => '175 - PP/MOPSY',
+    '241' => '241 - PP/Thales',
+    '600' => '600 - E, PA'
 ];
 // --- ENDE: ZENTRALE KONFIGURATION & BERECHTIGUNGEN ---
 
@@ -34,7 +49,7 @@ try {
     $can_edit_master_data = ($loggedInUserDept === 'PV') || $is_special_admin;
 
     if ($action === 'Änderung speichern' && $id && ctype_digit((string)$id)) {
-        
+
         $stmt_old_record = $pdo->prepare("SELECT * FROM zeichnverw WHERE id = :id");
         $stmt_old_record->execute(['id' => $id]);
         $old_record = $stmt_old_record->fetch(PDO::FETCH_ASSOC);
@@ -54,24 +69,28 @@ try {
             $data_to_save['dokart'] = trim($_POST['dokart'] ?? $old_record['dokart']);
             $data_to_save['teildok'] = trim($_POST['teildok'] ?? $old_record['teildok']);
             $data_to_save['hinw'] = trim($_POST['hinw'] ?? $old_record['hinw']);
-            
+
             $submitted_indices = $_POST['dynamic_indices'] ?? [];
             for ($i = 1; $i <= 7; $i++) {
-                $submitted_value = $submitted_indices[$i-1] ?? $old_record['ind'.$i];
+                $submitted_value = $submitted_indices[$i - 1] ?? $old_record['ind' . $i];
                 // KORREKTUR: Leeren String in NULL umwandeln
-                $data_to_save['ind'.$i] = ($submitted_value === '') ? null : $submitted_value;
+                $data_to_save['ind' . $i] = ($submitted_value === '') ? null : $submitted_value;
             }
         } else {
             $data_to_save = array_merge($data_to_save, [
-                'sachnr' => $old_record['sachnr'], 'kurz' => $old_record['kurz'], 'aez' => $old_record['aez'],
-                'dokart' => $old_record['dokart'], 'teildok' => $old_record['teildok'], 'hinw' => $old_record['hinw']
+                'sachnr' => $old_record['sachnr'],
+                'kurz' => $old_record['kurz'],
+                'aez' => $old_record['aez'],
+                'dokart' => $old_record['dokart'],
+                'teildok' => $old_record['teildok'],
+                'hinw' => $old_record['hinw']
             ]);
             for ($i = 1; $i <= 7; $i++) {
-                $data_to_save['ind'.$i] = $old_record['ind'.$i];
+                $data_to_save['ind' . $i] = $old_record['ind' . $i];
             }
         }
-        
-        $data_to_save['dat'] = date('Y-m-d');
+
+        $data_to_save['dat'] = $old_record['dat'];
 
         if ($is_special_admin) {
             $data_to_save['record_status'] = isset($_POST['record_status_checkbox']) ? 1 : 0;
@@ -81,8 +100,8 @@ try {
 
         $submitted_dept_checkboxes = $_POST['department_status_checkbox'] ?? [];
         for ($i = 1; $i <= 7; $i++) {
-            $current_index_code = $data_to_save['ind'.$i] ?? null;
-            $current_status = $old_record['ind'.$i.'_status'];
+            $current_index_code = $data_to_save['ind' . $i] ?? null;
+            $current_status = $old_record['ind' . $i . '_status'];
             if (!empty($current_index_code)) {
                 $index_desc = $index_options_list[$current_index_code] ?? '';
                 $parts = explode(' - ', $index_desc);
@@ -94,7 +113,7 @@ try {
                     }
                 }
             }
-            $data_to_save['ind'.$i.'_status'] = $current_status;
+            $data_to_save['ind' . $i . '_status'] = $current_status;
         }
 
         $sql = "UPDATE zeichnverw SET 
@@ -104,35 +123,60 @@ try {
                     ind5=:ind5, ind5_status=:ind5_status, ind6=:ind6, ind6_status=:ind6_status,
                     ind7=:ind7, ind7_status=:ind7_status
                 WHERE id=:id";
-        
+
         $params_for_sql = $data_to_save;
         $params_for_sql['id'] = $id;
 
         $stmt = $pdo->prepare($sql);
         $stmt->execute($params_for_sql);
 
-        log_action($pdo, 'UPDATE_RECORD', (int)$id, 'zeichnverw', ['new_data' => $data_to_save]);
+        // --- START: NEUE LOGIK ZUM ERKENNEN VON ÄNDERUNGEN ---
+
+        // 1. Ein leeres Array für die Änderungen erstellen.
+        $changes = [];
+
+        // 2. Alle gespeicherten Felder durchgehen und mit dem alten Wert vergleichen.
+        foreach ($data_to_save as $key => $new_value) {
+            // Prüfen, ob sich der Wert vom alten Datensatz unterscheidet.
+            // Wir ignorieren den Vergleich für das Datum, da es sich immer ändert.
+            if ($key !== 'dat' && array_key_exists($key, $old_record) && $old_record[$key] != $new_value) {
+                $changes[$key] = [
+                    'alt' => $old_record[$key],
+                    'neu' => $new_value
+                ];
+            }
+        }
+
+        // 3. Nur wenn es tatsächliche Änderungen gab, wird ein Log-Eintrag erstellt.
+        if (!empty($changes)) {
+            log_action($pdo, 'UPDATE_RECORD', (int)$id, 'zeichnverw', $changes);
+        }
+        // --- ENDE: NEUE LOGIK ---
         $_SESSION['success_message'] = "Änderungen für Datensatz (ID: " . htmlspecialchars($id) . ") erfolgreich gespeichert.";
         header('Location: ds_aend.php?id=' . $id . '&suchsachnr=' . urlencode($suchsachnr_return));
         exit;
-
-    } elseif ($action === 'Speichern') { 
+    } elseif ($action === 'Speichern') {
         $params_for_sql = [
-            'sachnr' => trim($_POST['sachnr'] ?? ''), 'kurz' => trim($_POST['kurz'] ?? ''), 'aez' => trim($_POST['aez'] ?? ''),
-            'dokart' => trim($_POST['dokart'] ?? ''), 'teildok' => trim($_POST['teildok'] ?? ''), 'hinw' => trim($_POST['hinw'] ?? ''),
-            'dat' => date('Y-m-d'), 'record_status' => 0
+            'sachnr' => trim($_POST['sachnr'] ?? ''),
+            'kurz' => trim($_POST['kurz'] ?? ''),
+            'aez' => trim($_POST['aez'] ?? ''),
+            'dokart' => trim($_POST['dokart'] ?? ''),
+            'teildok' => trim($_POST['teildok'] ?? ''),
+            'hinw' => trim($_POST['hinw'] ?? ''),
+            'dat' => date('Y-m-d'),
+            'record_status' => 0
         ];
         $submitted_indices = $_POST['dynamic_indices'] ?? [];
         for ($i = 1; $i <= 7; $i++) {
-            $submitted_value = $submitted_indices[$i-1] ?? null;
+            $submitted_value = $submitted_indices[$i - 1] ?? null;
             // KORREKTUR: Leeren String in NULL umwandeln
-            $params_for_sql['ind'.$i] = ($submitted_value === '') ? null : $submitted_value;
-            $params_for_sql['ind'.$i.'_status'] = 0;
+            $params_for_sql['ind' . $i] = ($submitted_value === '') ? null : $submitted_value;
+            $params_for_sql['ind' . $i . '_status'] = 0;
         }
-        
+
         $sql = "INSERT INTO zeichnverw (sachnr, kurz, aez, dokart, teildok, hinw, dat, record_status, ind1, ind1_status, ind2, ind2_status, ind3, ind3_status, ind4, ind4_status, ind5, ind5_status, ind6, ind6_status, ind7, ind7_status) 
                 VALUES (:sachnr, :kurz, :aez, :dokart, :teildok, :hinw, :dat, :record_status, :ind1, :ind1_status, :ind2, :ind2_status, :ind3, :ind3_status, :ind4, :ind4_status, :ind5, :ind5_status, :ind6, :ind6_status, :ind7, :ind7_status)";
-        
+
         $stmt = $pdo->prepare($sql);
         $stmt->execute($params_for_sql);
         $new_id = $pdo->lastInsertId();
@@ -140,26 +184,41 @@ try {
         $_SESSION['success_message'] = "Neuer Datensatz erfolgreich gespeichert (Neue ID: " . htmlspecialchars($new_id) . ").";
         header('Location: scrolltab.php?suchsachnr=' . urlencode($params_for_sql['sachnr']));
         exit;
-
-    } elseif ($action === 'Datensatz löschen' && $id && ctype_digit((string)$id)) {
-        if(!$can_edit_master_data) {
-             $_SESSION['error_message'] = "Keine Berechtigung zum Löschen.";
-             header('Location: scrolltab.php');
-             exit;
+        // --- START: NEUE "SOFT DELETE" LOGIK ---
+    } elseif ($action === 'Zeichnung entfernen' && $id && ctype_digit((string)$id)) {
+        // Prüfen, ob der Benutzer die Berechtigung hat.
+        if (!$can_edit_master_data) {
+            $_SESSION['error_message'] = "Keine Berechtigung zum Entfernen.";
+            header('Location: scrolltab.php');
+            exit;
         }
-        $stmt_delete = $pdo->prepare("DELETE FROM zeichnverw WHERE id = :id");
-        $stmt_delete->execute(['id' => $id]);
-        log_action($pdo, 'DELETE_RECORD', (int)$id, 'zeichnverw', ['deleted_id' => $id]);
-        $_SESSION['success_message'] = "Datensatz (ID: " . htmlspecialchars($id) . ") erfolgreich gelöscht.";
+
+        // 1. Hole alle Daten des Datensatzes, bevor wir ihn ändern, für das Log.
+        $stmt_old_record = $pdo->prepare("SELECT * FROM zeichnverw WHERE id = :id");
+        $stmt_old_record->execute(['id' => $id]);
+        $record_to_archive = $stmt_old_record->fetch(PDO::FETCH_ASSOC);
+
+        if ($record_to_archive) {
+            // 2. Führe ein UPDATE statt eines DELETE aus. Setze den Status auf 0 (inaktiv/entfernt).
+            $stmt_soft_delete = $pdo->prepare("UPDATE zeichnverw SET record_status = 2 WHERE id = :id");
+            $stmt_soft_delete->execute(['id' => $id]);
+
+            // 3. Logge die Aktion und speichere den kompletten Datensatz in den Details.
+            log_action($pdo, 'RECORD_REMOVED', (int)$id, 'zeichnverw', $record_to_archive);
+
+            $_SESSION['success_message'] = "Zeichnung (ID: " . htmlspecialchars($id) . ") erfolgreich entfernt und archiviert.";
+        } else {
+            $_SESSION['error_message'] = "Datensatz zum Entfernen nicht gefunden.";
+        }
+
         header('Location: scrolltab.php?suchsachnr=' . urlencode($suchsachnr_return));
         exit;
-
+        // --- ENDE: NEUE "SOFT DELETE" LOGIK ---
     } else {
         $_SESSION['error_message'] = "Unbekannte oder ungültige Aktion.";
         header('Location: scrolltab.php');
         exit;
     }
-
 } catch (PDOException $e) {
     error_log("Database operation error in ds_speich.php: " . $e->getMessage());
     try {
@@ -171,4 +230,3 @@ try {
     header('Location: scrolltab.php?suchsachnr=' . urlencode($suchsachnr_return));
     exit;
 }
-?>

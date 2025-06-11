@@ -16,8 +16,12 @@ $is_special_admin = isset($_SESSION['user_id']) && in_array($_SESSION['user_id']
 
 // 2. Das "Wörterbuch", das Kürzel auf Namen übersetzt
 $department_map = [
-    'PP' => 'PP', 'PG' => 'PG', 'PF' => 'PF', 'PV' => 'PV',
-    'VS' => 'Versand', 'EK' => 'Einkauf'
+    'PP' => 'PP',
+    'PG' => 'PG',
+    'PF' => 'PF',
+    'PV' => 'PV',
+    'VS' => 'Versand',
+    'EK' => 'Einkauf'
 ];
 
 // 3. Benutzerdaten aus der Session holen
@@ -34,17 +38,19 @@ $can_edit_master_data = ($loggedInUserDepartment === 'PV') || $is_special_admin;
 // Optionslisten
 $index_options_list = [
     ''    => 'Keine Auswahl',
-    '140' => '140 - Technologie',
-    '141' => '141 - PG',
-    '142' => '142 - PG',
+    '140' => '140 - LP-Fertigung',
+    '141' => '141 - PG/Montage',
+    '142' => '142 - PG/Vorfertigung',
+    '143' => '143 - Q',
     '145' => '145 - PP',
     '146' => '146 - PF',
-    '600' => '600 - Einkauf',
-    '241' => '241 - PP',
-    '152' => '152 - PG',
-    '153' => '153 - PG',
+    '152' => '152 - PG/Waschen, Lackieren',
+    '153' => '153 - PG/Verguss',
     '154' => '154 - Versand',
-    '300' => '300 - Technologie'
+    '174' => '174 - A',
+    '175' => '175 - PP/MOPSY',
+    '241' => '241 - PP/Thales',
+    '600' => '600 - E, PA'
 ];
 $kurz_options_list = [
     '' => 'Keine Auswahl',
@@ -71,7 +77,9 @@ $kurz_options_list = [
     '(AGL)' => '(AGL) - Abgleichsliste (PF, PG, PP, Technologie)',
     '(FW)' => '(FW) - Firmware/ Software (PP, Technologie)',
     '(Etik)' => '(Etik) - Etikettenzeichnung (PF, PP, Wareneingang, Technologie)',
-    'ZUSB' => 'ZUSB', 'ZUST' => 'ZUST', 'ZUS' => 'ZUS'
+    'ZUSB' => 'ZUSB',
+    'ZUST' => 'ZUST',
+    'ZUS' => 'ZUS'
 ];
 
 $page_title = "Datensatz bearbeiten";
@@ -109,6 +117,7 @@ try {
 ?>
 <!DOCTYPE html>
 <html lang="de" data-bs-theme="dark">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -117,6 +126,7 @@ try {
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
     <link href="custom_styles.css" rel="stylesheet">
 </head>
+
 <body>
     <header class="app-header">
         <div class="logo-left"><img src="EPSa_logo_group_diap.svg" alt="EPSa Logo"></div>
@@ -133,10 +143,12 @@ try {
     <div class="container-fluid mt-3">
         <div class="app-main-content">
             <?php if (isset($_SESSION['error_message'])): ?>
-                <div class="alert alert-danger alert-dismissible fade show" role="alert"><?php echo htmlspecialchars($_SESSION['error_message']); unset($_SESSION['error_message']); ?><button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button></div>
+                <div class="alert alert-danger alert-dismissible fade show" role="alert"><?php echo htmlspecialchars($_SESSION['error_message']);
+                                                                                            unset($_SESSION['error_message']); ?><button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button></div>
             <?php endif; ?>
             <?php if (isset($_SESSION['success_message'])): ?>
-                <div class="alert alert-success alert-dismissible fade show" role="alert"><?php echo htmlspecialchars($_SESSION['success_message']); unset($_SESSION['success_message']); ?><button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button></div>
+                <div class="alert alert-success alert-dismissible fade show" role="alert"><?php echo htmlspecialchars($_SESSION['success_message']);
+                                                                                            unset($_SESSION['success_message']); ?><button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button></div>
             <?php endif; ?>
 
             <section class="form-section mb-4">
@@ -151,9 +163,20 @@ try {
                 <div class="table-responsive-custom-height mt-3" style="max-height: 200px;">
                     <table class="table table-striped table-hover table-sm table-bordered">
                         <thead class="table-dark">
-                            <tr><th>Sachnummer</th><th>Kurz</th><th>ÄZ</th><th>Dok.-Art</th><th>Teil-Dok.</th><th>Indizes</th><th>Datum</th><th>Hinweis</th></tr>
+                            <tr>
+                                <th>Sachnummer</th>
+                                <th>Kurz</th>
+                                <th>ÄZ</th>
+                                <th>Dok.-Art</th>
+                                <th>Teil-Dok.</th>
+                                <th>Indizes</th>
+                                <th>Datum</th>
+                                <th>Hinweis</th>
+                            </tr>
                         </thead>
-                        <tbody><?php $results = $results_display; $suchsachnr = $suchsachnr_display_filter; include("tabinh.php"); ?></tbody>
+                        <tbody><?php $results = $results_display;
+                                $suchsachnr = $suchsachnr_display_filter;
+                                include("tabinh.php"); ?></tbody>
                     </table>
                 </div>
             </section>
@@ -173,7 +196,7 @@ try {
                                 <label class="form-check-label fw-bold" for="record_status_checkbox_main">Zeichnung global erhalten <small class="text-muted">(Nur für Admins)</small></label>
                             </div>
                         </div>
-                        
+
                         <?php
                         // --- START: NEUER, FLEXIBLER BLOCK FÜR ABTEILUNGS-CHECKBOXEN ---
                         if (isset($record['record_status']) && $record['record_status']) {
@@ -186,7 +209,9 @@ try {
                                     $dept_name = count($parts) > 1 ? end($parts) : null;
                                     if ($dept_name) {
                                         $dept_code = array_search($dept_name, $department_map);
-                                        if ($dept_code) { $relevant_departments[$dept_code] = true; }
+                                        if ($dept_code) {
+                                            $relevant_departments[$dept_code] = true;
+                                        }
                                     }
                                 }
                             }
@@ -197,7 +222,7 @@ try {
                                 $departments_to_display[] = $loggedInUserDepartment;
                             }
                             foreach ($departments_to_display as $dept_code) {
-                                $is_dept_confirmed = true; 
+                                $is_dept_confirmed = true;
                                 for ($i = 1; $i <= 7; $i++) {
                                     $index_code_loop = $record['ind' . $i] ?? null;
                                     $index_status_loop = $record['ind' . $i . '_status'] ?? 0;
@@ -207,7 +232,8 @@ try {
                                         $dept_name_loop = count($parts_loop) > 1 ? end($parts_loop) : null;
                                         $dept_code_loop = array_search($dept_name_loop, $department_map);
                                         if ($dept_code_loop === $dept_code && $index_status_loop == 0) {
-                                            $is_dept_confirmed = false; break;
+                                            $is_dept_confirmed = false;
+                                            break;
                                         }
                                     }
                                 }
@@ -221,7 +247,7 @@ try {
                                     </div>
                                 </section>
                         <?php
-                            } 
+                            }
                         }
                         // --- ENDE DES NEUEN BLOCKS ---
                         ?>
@@ -261,7 +287,16 @@ try {
                                     <input type="hidden" name="kurz" id="kurz_combined_hidden" value="<?php echo htmlspecialchars($record['kurz']); ?>">
                                 <?php else: ?>
                                     <div class="read-only-kurz p-2 rounded form-control-sm" style="background-color: var(--bs-tertiary-bg); border: 1px solid var(--bs-border-color); min-height: 31px; line-height:normal; display:flex; align-items:center;">
-                                        <?php if (!empty($record['kurz'])) { $kurz_display_array = []; $temp_kurz_werte = explode(' ', trim($record['kurz'])); foreach ($temp_kurz_werte as $k_wert_ro) { $kurz_display_array[] = htmlspecialchars($kurz_options_list[$k_wert_ro] ?? $k_wert_ro); } echo implode('<span class="text-body-secondary mx-1">/</span>', $kurz_display_array); } else { echo '<span class="text-muted fst-italic">Kein Kürzel</span>'; } ?>
+                                        <?php if (!empty($record['kurz'])) {
+                                            $kurz_display_array = [];
+                                            $temp_kurz_werte = explode(' ', trim($record['kurz']));
+                                            foreach ($temp_kurz_werte as $k_wert_ro) {
+                                                $kurz_display_array[] = htmlspecialchars($kurz_options_list[$k_wert_ro] ?? $k_wert_ro);
+                                            }
+                                            echo implode('<span class="text-body-secondary mx-1">/</span>', $kurz_display_array);
+                                        } else {
+                                            echo '<span class="text-muted fst-italic">Kein Kürzel</span>';
+                                        } ?>
                                     </div>
                                     <input type="hidden" name="kurz" value="<?php echo htmlspecialchars($record['kurz']); ?>">
                                 <?php endif; ?>
@@ -278,34 +313,39 @@ try {
                             <div class="col-md-7">
                                 <label class="form-label d-block mb-1">Indizes (max. 7):</label>
                                 <div id="indices_selectors_container">
-                                <?php
+                                    <?php
                                     $hat_aktive_indizes_display = false;
-                                    for ($i = 1; $i <= 7; $i++) { if (!empty($record["ind$i"])) { $hat_aktive_indizes_display = true; break; } }
+                                    for ($i = 1; $i <= 7; $i++) {
+                                        if (!empty($record["ind$i"])) {
+                                            $hat_aktive_indizes_display = true;
+                                            break;
+                                        }
+                                    }
                                     if ($can_edit_master_data || $hat_aktive_indizes_display) {
                                         $form_idx_key_display = 0;
                                         for ($i = 1; $i <= 7; $i++) {
                                             $idx_wert_disp = $record["ind$i"] ?? '';
                                             $idx_status_disp = $record["ind{$i}_status"] ?? 0;
                                             if ($can_edit_master_data || !empty($idx_wert_disp)) {
-                                ?>
-                                            <div class="input-group mb-1 index-selector-group align-items-center">
-                                                <select name="dynamic_indices[<?php echo $form_idx_key_display; ?>]" class="form-select form-select-sm index-select <?php echo !$idx_status_disp ? 'status-not-received' : 'status-received'; ?>" <?php if (!$can_edit_master_data) echo 'disabled'; ?>>
-                                                    <?php foreach ($index_options_list as $value_opt => $display_text_opt): ?>
-                                                        <option value="<?php echo htmlspecialchars($value_opt); ?>" <?php if ((string)$idx_wert_disp === (string)$value_opt) echo 'selected'; ?>><?php echo htmlspecialchars($display_text_opt); ?></option>
-                                                    <?php endforeach; ?>
-                                                </select>
-                                                <?php if ($can_edit_master_data): ?>
-                                                    <button type="button" class="btn btn-danger btn-sm remove-index-btn ms-2">-</button>
-                                                <?php endif; ?>
-                                            </div>
-                                <?php
-                                            $form_idx_key_display++;
+                                    ?>
+                                                <div class="input-group mb-1 index-selector-group align-items-center">
+                                                    <select name="dynamic_indices[<?php echo $form_idx_key_display; ?>]" class="form-select form-select-sm index-select <?php echo !$idx_status_disp ? 'status-not-received' : 'status-received'; ?>" <?php if (!$can_edit_master_data) echo 'disabled'; ?>>
+                                                        <?php foreach ($index_options_list as $value_opt => $display_text_opt): ?>
+                                                            <option value="<?php echo htmlspecialchars($value_opt); ?>" <?php if ((string)$idx_wert_disp === (string)$value_opt) echo 'selected'; ?>><?php echo htmlspecialchars($display_text_opt); ?></option>
+                                                        <?php endforeach; ?>
+                                                    </select>
+                                                    <?php if ($can_edit_master_data): ?>
+                                                        <button type="button" class="btn btn-danger btn-sm remove-index-btn ms-2">-</button>
+                                                    <?php endif; ?>
+                                                </div>
+                                    <?php
+                                                $form_idx_key_display++;
                                             }
                                         }
-                                    }  else {
+                                    } else {
                                         echo '<div class="read-only-indices p-2 rounded" style="background-color: var(--bs-body-bg); border: 1px solid var(--bs-border-color);"><span class="text-muted fst-italic">Keine Indizes zugeordnet.</span></div>';
                                     }
-                                ?>
+                                    ?>
                                 </div>
                                 <?php if ($can_edit_master_data): ?>
                                     <button type="button" id="add_index_btn" class="btn btn-success btn-sm mt-1"><i class="bi bi-plus-lg"></i> Index hinzufügen</button>
@@ -314,9 +354,14 @@ try {
                             <div class="col-md-5">
                                 <label class="form-label d-block mb-1">Datum:</label>
                                 <div class="d-flex align-items-center">
-                                    <?php 
+                                    <?php
                                     $date_obj = null;
-                                    if ($record['dat'] && $record['dat'] !== '0000-00-00') { try { $date_obj = new DateTime($record['dat']); } catch(Exception $e) {} }
+                                    if ($record['dat'] && $record['dat'] !== '0000-00-00') {
+                                        try {
+                                            $date_obj = new DateTime($record['dat']);
+                                        } catch (Exception $e) {
+                                        }
+                                    }
                                     ?>
                                     <input name="t_dat_display" type="text" class="form-control form-control-sm" placeholder="TT" style="width: 65px;" value="<?php echo $date_obj ? $date_obj->format('d') : ''; ?>" readonly>
                                     <span class="ps-1 pe-1 text-center">.</span>
@@ -333,32 +378,76 @@ try {
                                 <input id="hinw_edit" name="hinw" type="text" class="form-control form-control-sm" value="<?php echo htmlspecialchars($record['hinw']); ?>" maxlength="50" <?php if (!$can_edit_master_data) echo 'readonly'; ?>>
                             </div>
                         </div>
-                        
+
                         <div class="mt-4 d-flex gap-2">
                             <button type="submit" class="btn btn-success"><i class="bi bi-save"></i> Änderungen speichern</button>
-                            <?php if($can_edit_master_data): ?>
-                            <button type="submit" class="btn btn-danger" name="action" value="Datensatz löschen" onclick="return confirm('Sind Sie sicher, dass Sie diesen Datensatz (ID: <?php echo htmlspecialchars($id_to_edit); ?>) endgültig löschen möchten?');"><i class="bi bi-trash"></i> Datensatz löschen</button>
+                            <?php if ($can_edit_master_data): ?>
+                              <button type="submit" class="btn btn-warning" name="action" value="Zeichnung entfernen" onclick="return confirm('Soll diese Zeichnung wirklich entfernt und archiviert werden? Der Datensatz bleibt erhalten.')"><i class="bi bi-archive"></i> Zeichnung entfernen</button>
                             <?php endif; ?>
                             <a href="scrolltab.php?suchsachnr=<?php echo htmlspecialchars($suchsachnr_param); ?>" class="btn btn-secondary"><i class="bi bi-x-circle"></i> Abbrechen</a>
                         </div>
                     </form>
                 </section>
+                <div class="button-group ...">
+        <button type="button" class="btn btn-info me-2" data-bs-toggle="modal" data-bs-target="#logModal">
+            <i class="bi bi-clock-history"></i> Log-Verlauf anzeigen
+        </button>
+
+        <div class="modal fade" id="logModal" tabindex="-1" aria-labelledby="logModalLabel" aria-hidden="true">
+            <div class="modal-dialog modal-xl modal-dialog-scrollable">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="logModalLabel">Log-Verlauf für Datensatz ID: <?php echo htmlspecialchars($id_to_edit); ?></h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body" id="logModalBody">
+                        Lade Logs...
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Schließen</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <script>
+            document.addEventListener('DOMContentLoaded', function() {
+                const logModal = document.getElementById('logModal');
+                logModal.addEventListener('show.bs.modal', function() {
+                    const modalBody = document.getElementById('logModalBody');
+                    modalBody.innerHTML = '<div class="text-center"><div class="spinner-border" role="status"><span class="visually-hidden">Loading...</span></div></div>';
+
+                    fetch('get_logs.php?id=<?php echo $id_to_edit; ?>')
+                        .then(response => response.text())
+                        .then(data => {
+                            modalBody.innerHTML = data;
+                        })
+                        .catch(error => {
+                            modalBody.innerHTML = '<div class="alert alert-danger">Fehler beim Laden der Logs.</div>';
+                            console.error('Error:', error);
+                        });
+                });
+            });
+        </script>
             <?php else: ?>
                 <div class="alert alert-warning">Der Datensatz konnte nicht geladen werden.</div>
             <?php endif; ?>
         </div>
     </div>
 
-    <footer class="text-center text-body-secondary py-3 mt-3">
-        <small>&copy; <?php echo date("Y"); ?> Ihre Firma. Alle Rechte vorbehalten.</small>
-    </footer>
+    
 
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-    <script>
-        // Ihr JavaScript zur Steuerung der dynamischen Felder "Kurz" und "Indizes"
-        document.addEventListener('DOMContentLoaded', function () {
-            // ... (Hier würde der JavaScript-Code stehen, der die "+"- und "-"-Buttons steuert)
-        });
-    </script>
+        <footer class="text-center text-body-secondary py-3 mt-3">
+            <small>&copy; <?php echo date("Y"); ?> Ihre Firma. Alle Rechte vorbehalten.</small>
+        </footer>
+
+        <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+        <script>
+            // Ihr JavaScript zur Steuerung der dynamischen Felder "Kurz" und "Indizes"
+            document.addEventListener('DOMContentLoaded', function() {
+                // ... (Hier würde der JavaScript-Code stehen, der die "+"- und "-"-Buttons steuert)
+            });
+        </script>
 </body>
+
 </html>

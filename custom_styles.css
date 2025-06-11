@@ -232,3 +232,29 @@ tr.status-record-not-received td {
 .app-header-startseite-link a:hover i {
   color: var(--app-secondary-accent-color) !important; /* Farbe beim Hovern, z.B. Ihre Sekundär-Akzentfarbe */
 }
+
+
+/* ========================================================
+   FINALE STILE FÜR ARCHIVIERTE DATENSÄTZE (Angepasste Version)
+   ======================================================== */
+
+/* 1. Stil für JEDE ZELLE (<td>) in einer archivierten Zeile.
+      Das ist die wichtigste Änderung, um den Hintergrund zu erzwingen. */
+.status-archiviert td {
+    background-color: #00000083 !important; /* Ihr dunkler Grauton */
+    color: #525557;                      /* Eine helle, aber dezent graue Schriftfarbe */
+    font-style: italic;                   /* NEU: Macht allen Text in der Zeile kursiv */
+}
+
+/* 2. Stil für die Links (inkl. Bearbeiten-Stift) in der archivierten Zeile */
+.status-archiviert a {
+    color: #868e96 !important; /* NEU: Ein deutlich ausgegrauter Farbton für den Stift */
+}
+
+/* 3. Eigene Klasse für die Zahlen, die "nicht erhalten" UND archiviert sind.
+      Diese Regel bleibt, da sie für die Zahlen bereits funktioniert. */
+.index-wert-archiviert-und-nicht-erhalten {
+    color: #525557;
+    font-style: italic;
+    font-weight: normal;
+}
