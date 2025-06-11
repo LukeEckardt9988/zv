@@ -1,7 +1,7 @@
 <?php
-// ds_speich.php (angepasst für abteilungsspezifische Index-Status-Checkbox)
-require_once 'config.php'; // Stellt sicher, dass ggf. functions.php mit log_action() geladen wird
-require_once 'db_connect.php'; // Stellt $pdo bereit
+// ds_speich.php (FINALE KORREKTUR v4 - Behebt "Incorrect integer value" Fehler)
+require_once 'config.php';
+require_once 'db_connect.php';
 
 if (!isset($_SESSION['user_id'])) {
     $_SESSION['error_message'] = "Nicht authentifiziert. Aktion abgebrochen.";
@@ -9,260 +9,166 @@ if (!isset($_SESSION['user_id'])) {
     exit;
 }
 
+// --- START: ZENTRALE KONFIGURATION & BERECHTIGUNGEN ---
+$authorized_user_ids = [4, 10, 3];
+$department_map = [
+    'PP' => 'PP', 'PG' => 'PG', 'PF' => 'PF', 'PV' => 'PV',
+    'VS' => 'Versand', 'EK' => 'Einkauf'
+];
+$index_options_list = [
+    ''    => 'Keine Auswahl', '140' => '140 - Technologie', '141' => '141 - PG', '142' => '142 - PG',
+    '145' => '145 - PP', '146' => '146 - PF', '600' => '600 - Einkauf', '241' => '241 - PP',
+    '152' => '152 - PG', '153' => '153 - PG', '154' => '154 - Versand', '300' => '300 - Technologie'
+];
+// --- ENDE: ZENTRALE KONFIGURATION & BERECHTIGUNGEN ---
+
 $action = $_POST['action'] ?? null;
 $id = $_POST['id'] ?? null;
 $suchsachnr_return = trim($_POST['suchsachnr_return'] ?? '');
 
-// Angemeldete Benutzerdaten für Berechtigungen holen
-$loggedInUserDepartment = strtoupper($_SESSION['user_department'] ?? '');
+try {
+    // --- BERECHTIGUNGEN DES AKTUELLEN USERS PRÜFEN ---
+    $loggedInUserId = $_SESSION['user_id'];
+    $loggedInUserDept = strtoupper($_SESSION['user_department'] ?? '');
+    $is_special_admin = in_array($loggedInUserId, $authorized_user_ids);
+    $can_edit_master_data = ($loggedInUserDept === 'PV') || $is_special_admin;
 
-// Formulardaten sammeln
-$sachnr = trim($_POST['sachnr'] ?? '');
-$kurz = trim($_POST['kurz'] ?? '');
-$aez = trim($_POST['aez'] ?? '');
-$dokart = trim($_POST['dokart'] ?? '');
-$teildok = trim($_POST['teildok'] ?? '');
-$hinw = trim($_POST['hinw'] ?? '');
-$vers = trim($_POST['vers'] ?? '');
+    if ($action === 'Änderung speichern' && $id && ctype_digit((string)$id)) {
+        
+        $stmt_old_record = $pdo->prepare("SELECT * FROM zeichnverw WHERE id = :id");
+        $stmt_old_record->execute(['id' => $id]);
+        $old_record = $stmt_old_record->fetch(PDO::FETCH_ASSOC);
 
-// 1. Automatisches Datum setzen
-$dat_combined = date('Y-m-d');
-
-// Globalen "record_status" verarbeiten (gesteuert durch PG)
-$record_status_for_save = 0; // Standard für neue Datensätze
-if ($action === 'Änderung speichern') {
-    // Wert für globale Checkbox (die von PG bedient wird)
-    $record_status_for_save = (isset($_POST['record_status_checkbox']) && $_POST['record_status_checkbox'] == '1') ? 1 : 0;
-
-    // Wenn der aktuelle User nicht PG ist, MUSS der alte Wert von record_status aus der DB genommen werden,
-    // da die Checkbox für ihn disabled ist und nicht im POST ankommt, wenn sie vorher 1 war.
-    if ($loggedInUserDepartment !== 'PG') {
-        $stmt_old_global_status = $pdo->prepare("SELECT record_status FROM zeichnverw WHERE id = :id");
-        $stmt_old_global_status->execute(['id' => $id]);
-        $old_global_status_data = $stmt_old_global_status->fetch(PDO::FETCH_ASSOC);
-        if ($old_global_status_data) {
-            $record_status_for_save = $old_global_status_data['record_status'];
+        if (!$old_record) {
+            $_SESSION['error_message'] = "Datensatz zum Aktualisieren nicht gefunden (ID: $id).";
+            header('Location: scrolltab.php');
+            exit;
         }
-    }
-}
 
+        $data_to_save = [];
 
-// 2. Dynamische Indizes und deren abteilungsspezifischen Status verarbeiten
-$indizes_to_save = [];
-$submitted_indices_values = $_POST['dynamic_indices'] ?? [];
-// Wert der NEUEN abteilungsspezifischen Checkbox "Alle meine [Abt.] Indizes als erhalten markieren"
-$department_indices_batch_status_checked = (isset($_POST['my_department_indices_status']) && $_POST['my_department_indices_status'] == '1');
-
-// Optionsliste wird benötigt, um die Abteilung eines Indexwertes zu bestimmen
-// Es wird angenommen, dass $index_options_list in diesem Kontext verfügbar ist
-// (z.B. aus config.php oder hier direkt definiert, falls nicht schon in config.php)
-if (!isset($index_options_list) || !is_array($index_options_list)) {
-    // Fallback oder Fehler, falls $index_options_list nicht verfügbar ist.
-    // Für dieses Beispiel wird angenommen, sie ist global verfügbar oder wird hier geladen.
-    // Sie haben sie in ds_aend.php und scrolltab.php definiert,
-    // ds_speich.php braucht sie aber auch für die Zuordnung.
-    // Am besten in config.php zentral definieren oder hier erneut.
-    $index_options_list = [
-        ''    => 'Keine Auswahl',
-        '140' => '140 - Technologie',
-        '141' => '141 - PG',
-        '142' => '142 - PG',
-        '145' => '145 - PP',
-        '146' => '146 - PF',
-        '600' => '600 - Einkauf',
-        '241' => '241 - PP',
-        '152' => '152 - PG',
-        '153' => '153 - PG',
-        '154' => '154 - Versand',
-        '300' => '300 - Technologie'
-    ];
-}
-
-
-if ($action === 'Änderung speichern' && $id) {
-    $stmt_current_indices_data = $pdo->prepare(
-        "SELECT ind1, ind1_status, ind2, ind2_status, ind3, ind3_status, ind4, ind4_status, 
-                ind5, ind5_status, ind6, ind6_status, ind7, ind7_status 
-         FROM zeichnverw WHERE id = :id"
-    );
-    $stmt_current_indices_data->execute(['id' => $id]);
-    $current_db_indices = $stmt_current_indices_data->fetch(PDO::FETCH_ASSOC);
-
-    for ($i = 0; $i < 7; $i++) {
-        $db_col_num = $i + 1;
-        $index_col_name = "ind" . $db_col_num;
-        $status_col_name = "ind" . $db_col_num . "_status";
-        $aktueller_index_wert_fuer_slot = null;
-
-        // Index-Wert bestimmen (PV kann ändern, andere nicht - Wert kommt aus POST wenn PV, sonst DB)
-        if (isset($submitted_indices_values[$i]) && $submitted_indices_values[$i] !== '' && $loggedInUserDepartment === 'PV') {
-            $aktueller_index_wert_fuer_slot = trim($submitted_indices_values[$i]);
-        } else if ($current_db_indices && isset($current_db_indices[$index_col_name])) {
-            $aktueller_index_wert_fuer_slot = $current_db_indices[$index_col_name];
+        if ($can_edit_master_data) {
+            $data_to_save['sachnr'] = trim($_POST['sachnr'] ?? $old_record['sachnr']);
+            $data_to_save['kurz'] = trim($_POST['kurz'] ?? $old_record['kurz']);
+            $data_to_save['aez'] = trim($_POST['aez'] ?? $old_record['aez']);
+            $data_to_save['dokart'] = trim($_POST['dokart'] ?? $old_record['dokart']);
+            $data_to_save['teildok'] = trim($_POST['teildok'] ?? $old_record['teildok']);
+            $data_to_save['hinw'] = trim($_POST['hinw'] ?? $old_record['hinw']);
+            
+            $submitted_indices = $_POST['dynamic_indices'] ?? [];
+            for ($i = 1; $i <= 7; $i++) {
+                $submitted_value = $submitted_indices[$i-1] ?? $old_record['ind'.$i];
+                // KORREKTUR: Leeren String in NULL umwandeln
+                $data_to_save['ind'.$i] = ($submitted_value === '') ? null : $submitted_value;
+            }
+        } else {
+            $data_to_save = array_merge($data_to_save, [
+                'sachnr' => $old_record['sachnr'], 'kurz' => $old_record['kurz'], 'aez' => $old_record['aez'],
+                'dokart' => $old_record['dokart'], 'teildok' => $old_record['teildok'], 'hinw' => $old_record['hinw']
+            ]);
+            for ($i = 1; $i <= 7; $i++) {
+                $data_to_save['ind'.$i] = $old_record['ind'.$i];
+            }
         }
-        $indizes_to_save[$index_col_name] = $aktueller_index_wert_fuer_slot;
+        
+        $data_to_save['dat'] = date('Y-m-d');
 
-        // Status bestimmen
-        $neuer_status_fuer_diesen_index = $current_db_indices[$status_col_name] ?? 0; // Standard: alten Status beibehalten
+        if ($is_special_admin) {
+            $data_to_save['record_status'] = isset($_POST['record_status_checkbox']) ? 1 : 0;
+        } else {
+            $data_to_save['record_status'] = $old_record['record_status'];
+        }
 
-        if (!empty($aktueller_index_wert_fuer_slot)) {
-            $index_department_code = '';
-            if (isset($index_options_list[$aktueller_index_wert_fuer_slot])) {
-                $option_display_text = $index_options_list[$aktueller_index_wert_fuer_slot];
-                if (preg_match('/-\s*(PP|PG|PF|PV)\b/i', $option_display_text, $matches_dept)) {
-                    $index_department_code = strtoupper($matches_dept[1]);
+        $submitted_dept_checkboxes = $_POST['department_status_checkbox'] ?? [];
+        for ($i = 1; $i <= 7; $i++) {
+            $current_index_code = $data_to_save['ind'.$i] ?? null;
+            $current_status = $old_record['ind'.$i.'_status'];
+            if (!empty($current_index_code)) {
+                $index_desc = $index_options_list[$current_index_code] ?? '';
+                $parts = explode(' - ', $index_desc);
+                $dept_name = count($parts) > 1 ? end($parts) : null;
+                $dept_code = $dept_name ? array_search($dept_name, $department_map) : null;
+                if ($dept_code && isset($submitted_dept_checkboxes[$dept_code])) {
+                    if ($loggedInUserDept === $dept_code || $is_special_admin) {
+                        $current_status = 1;
+                    }
                 }
             }
-
-            // Wenn der Index zur Abteilung des angemeldeten Benutzers gehört,
-            // wird sein Status durch die abteilungsspezifische Checkbox bestimmt.
-            if ($loggedInUserDepartment === $index_department_code && in_array($loggedInUserDepartment, ['PP', 'PG', 'PF', 'PV'])) {
-                $neuer_status_fuer_diesen_index = $department_indices_batch_status_checked ? 1 : 0;
-            }
+            $data_to_save['ind'.$i.'_status'] = $current_status;
         }
-        $indizes_to_save[$status_col_name] = $neuer_status_fuer_diesen_index;
 
-        if (empty($indizes_to_save[$index_col_name])) {
-            $indizes_to_save[$index_col_name] = null;
-            $indizes_to_save[$status_col_name] = 0; // Wenn kein Indexwert, dann auch kein "erhalten" Status
-        }
-    }
-} else if ($action === 'Speichern') { // Neuer Datensatz
-    for ($i = 0; $i < 7; $i++) {
-        $db_col_num = $i + 1;
-        if (isset($submitted_indices_values[$i]) && $submitted_indices_values[$i] !== '') {
-            $ind_val = trim($submitted_indices_values[$i]);
-            $indizes_to_save["ind" . $db_col_num] = $ind_val;
-            $indizes_to_save["ind" . $db_col_num . "_status"] = 0; // Bei neuen Datensätzen immer 0
-        } else {
-            $indizes_to_save["ind" . $db_col_num] = null;
-            $indizes_to_save["ind" . $db_col_num . "_status"] = 0;
-        }
-    }
-    // $record_status_for_save ist bereits 0 für neue Datensätze
-}
-
-
-$params = []; // Für den catch-Block initialisieren
-
-try {
-    if ($action === 'Datensatz löschen' && $id && ctype_digit((string)$id)) {
-        // ... (Logik wie zuvor)
-        $stmt_old_data = $pdo->prepare("SELECT sachnr FROM zeichnverw WHERE id = :id");
-        $stmt_old_data->execute(['id' => $id]);
-        $old_data_for_log = $stmt_old_data->fetch(PDO::FETCH_ASSOC);
-        $stmt = $pdo->prepare("DELETE FROM zeichnverw WHERE id = :id");
-        $stmt->execute(['id' => $id]);
-        log_action($pdo, 'DELETE_RECORD', (int)$id, 'zeichnverw', ['sachnr_deleted' => $old_data_for_log['sachnr'] ?? 'N/A']);
-        $_SESSION['success_message'] = "Datensatz (ID: " . htmlspecialchars($id) . ") erfolgreich gelöscht.";
-        header('Location: scrolltab.php?suchsachnr=' . urlencode($suchsachnr_return));
-        exit;
-    } elseif ($action === 'Änderung speichern' && $id && ctype_digit((string)$id)) {
-        $sql = "UPDATE zeichnverw SET
-                    sachnr=:sachnr, kurz=:kurz, aez=:aez, dokart=:dokart, teildok=:teildok,
+        $sql = "UPDATE zeichnverw SET 
+                    sachnr=:sachnr, kurz=:kurz, aez=:aez, dokart=:dokart, teildok=:teildok, hinw=:hinw, dat=:dat, record_status=:record_status,
                     ind1=:ind1, ind1_status=:ind1_status, ind2=:ind2, ind2_status=:ind2_status,
                     ind3=:ind3, ind3_status=:ind3_status, ind4=:ind4, ind4_status=:ind4_status,
                     ind5=:ind5, ind5_status=:ind5_status, ind6=:ind6, ind6_status=:ind6_status,
-                    ind7=:ind7, ind7_status=:ind7_status,
-                    dat=:dat, hinw=:hinw, vers=:vers, record_status=:record_status
-                WHERE id = :id";
-        $params = [
-            'sachnr' => $sachnr,
-            'kurz' => $kurz,
-            'aez' => $aez,
-            'dokart' => $dokart,
-            'teildok' => $teildok,
-            'ind1' => $indizes_to_save['ind1'],
-            'ind1_status' => $indizes_to_save['ind1_status'],
-            'ind2' => $indizes_to_save['ind2'],
-            'ind2_status' => $indizes_to_save['ind2_status'],
-            'ind3' => $indizes_to_save['ind3'],
-            'ind3_status' => $indizes_to_save['ind3_status'],
-            'ind4' => $indizes_to_save['ind4'],
-            'ind4_status' => $indizes_to_save['ind4_status'],
-            'ind5' => $indizes_to_save['ind5'],
-            'ind5_status' => $indizes_to_save['ind5_status'],
-            'ind6' => $indizes_to_save['ind6'],
-            'ind6_status' => $indizes_to_save['ind6_status'],
-            'ind7' => $indizes_to_save['ind7'],
-            'ind7_status' => $indizes_to_save['ind7_status'],
-            'dat' => $dat_combined,
-            'hinw' => $hinw,
-            'vers' => $vers,
-            'record_status' => $record_status_for_save,
-            'id' => $id
-        ];
+                    ind7=:ind7, ind7_status=:ind7_status
+                WHERE id=:id";
+        
+        $params_for_sql = $data_to_save;
+        $params_for_sql['id'] = $id;
+
         $stmt = $pdo->prepare($sql);
-        $stmt->execute($params);
-        log_action($pdo, 'UPDATE_RECORD', (int)$id, 'zeichnverw', ['sachnr_updated' => $sachnr]);
+        $stmt->execute($params_for_sql);
+
+        log_action($pdo, 'UPDATE_RECORD', (int)$id, 'zeichnverw', ['new_data' => $data_to_save]);
         $_SESSION['success_message'] = "Änderungen für Datensatz (ID: " . htmlspecialchars($id) . ") erfolgreich gespeichert.";
         header('Location: ds_aend.php?id=' . $id . '&suchsachnr=' . urlencode($suchsachnr_return));
         exit;
-    } elseif ($action === 'Speichern') { // Neuer Datensatz
-        $sql = "INSERT INTO zeichnverw (
-                    sachnr, kurz, aez, dokart, teildok,
-                    ind1, ind1_status, ind2, ind2_status, ind3, ind3_status, ind4, ind4_status,
-                    ind5, ind5_status, ind6, ind6_status, ind7, ind7_status,
-                    dat, hinw, vers, record_status
-                ) VALUES (
-                    :sachnr, :kurz, :aez, :dokart, :teildok,
-                    :ind1, :ind1_status, :ind2, :ind2_status, :ind3, :ind3_status, :ind4, :ind4_status,
-                    :ind5, :ind5_status, :ind6, :ind6_status, :ind7, :ind7_status,
-                    :dat, :hinw, :vers, :record_status
-                )";
-        $params = [
-            'sachnr' => $sachnr,
-            'kurz' => $kurz,
-            'aez' => $aez,
-            'dokart' => $dokart,
-            'teildok' => $teildok,
-            'ind1' => $indizes_to_save['ind1'],
-            'ind1_status' => $indizes_to_save['ind1_status'],
-            'ind2' => $indizes_to_save['ind2'],
-            'ind2_status' => $indizes_to_save['ind2_status'],
-            'ind3' => $indizes_to_save['ind3'],
-            'ind3_status' => $indizes_to_save['ind3_status'],
-            'ind4' => $indizes_to_save['ind4'],
-            'ind4_status' => $indizes_to_save['ind4_status'],
-            'ind5' => $indizes_to_save['ind5'],
-            'ind5_status' => $indizes_to_save['ind5_status'],
-            'ind6' => $indizes_to_save['ind6'],
-            'ind6_status' => $indizes_to_save['ind6_status'],
-            'ind7' => $indizes_to_save['ind7'],
-            'ind7_status' => $indizes_to_save['ind7_status'],
-            'dat' => $dat_combined,
-            'hinw' => $hinw,
-            'vers' => $vers,
-            'record_status' => 0 // Neue Datensätze sind standardmäßig "nicht erhalten" für globalen Status
-        ];
-        $stmt = $pdo->prepare($sql);
-        $stmt->execute($params);
-        $new_id = $pdo->lastInsertId();
-        log_action($pdo, 'CREATE_RECORD', (int)$new_id, 'zeichnverw', ['sachnr_created' => $sachnr]);
-        $_SESSION['success_message'] = "Neuer Datensatz erfolgreich gespeichert (Neue ID: " . htmlspecialchars($new_id) . ").";
-        header('Location: scrolltab.php?suchsachnr=' . urlencode($sachnr));
-        exit;
-    } else {
-        $_SESSION['error_message'] = "Unbekannte oder ungültige Aktion: " . htmlspecialchars($action);
-        header('Location: scrolltab.php?suchsachnr=' . urlencode($suchsachnr_return));
-        exit;
-    }
-} catch (PDOException $e) {
-    error_log("Database operation error in ds_speich.php: " . $e->getMessage() . " for action: " . $action . " with params: " . json_encode($params ?? []));
-    $errorMessage = "Ein Datenbankfehler ist aufgetreten. ";
-    if (isset($e->errorInfo[1]) && $e->errorInfo[1] == 1062) {
-        $errorMessage .= "Eintrag (z.B. Sachnummer) existiert bereits oder ein anderer UNIQUE Index wurde verletzt.";
-    } else {
-        $errorMessage .= "Details wurden protokolliert. Bitte versuchen Sie es später erneut.";
-    }
-    $_SESSION['error_message'] = $errorMessage;
 
-    if ($action === 'Änderung speichern' && $id) {
-        header('Location: ds_aend.php?id=' . $id . '&suchsachnr=' . urlencode($suchsachnr_return));
-    } elseif ($action === 'Speichern') {
-        header('Location: scrolltab.php?suchsachnr=' . urlencode($sachnr));
-    } else {
+    } elseif ($action === 'Speichern') { 
+        $params_for_sql = [
+            'sachnr' => trim($_POST['sachnr'] ?? ''), 'kurz' => trim($_POST['kurz'] ?? ''), 'aez' => trim($_POST['aez'] ?? ''),
+            'dokart' => trim($_POST['dokart'] ?? ''), 'teildok' => trim($_POST['teildok'] ?? ''), 'hinw' => trim($_POST['hinw'] ?? ''),
+            'dat' => date('Y-m-d'), 'record_status' => 0
+        ];
+        $submitted_indices = $_POST['dynamic_indices'] ?? [];
+        for ($i = 1; $i <= 7; $i++) {
+            $submitted_value = $submitted_indices[$i-1] ?? null;
+            // KORREKTUR: Leeren String in NULL umwandeln
+            $params_for_sql['ind'.$i] = ($submitted_value === '') ? null : $submitted_value;
+            $params_for_sql['ind'.$i.'_status'] = 0;
+        }
+        
+        $sql = "INSERT INTO zeichnverw (sachnr, kurz, aez, dokart, teildok, hinw, dat, record_status, ind1, ind1_status, ind2, ind2_status, ind3, ind3_status, ind4, ind4_status, ind5, ind5_status, ind6, ind6_status, ind7, ind7_status) 
+                VALUES (:sachnr, :kurz, :aez, :dokart, :teildok, :hinw, :dat, :record_status, :ind1, :ind1_status, :ind2, :ind2_status, :ind3, :ind3_status, :ind4, :ind4_status, :ind5, :ind5_status, :ind6, :ind6_status, :ind7, :ind7_status)";
+        
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute($params_for_sql);
+        $new_id = $pdo->lastInsertId();
+        log_action($pdo, 'CREATE_RECORD', (int)$new_id, 'zeichnverw', $params_for_sql);
+        $_SESSION['success_message'] = "Neuer Datensatz erfolgreich gespeichert (Neue ID: " . htmlspecialchars($new_id) . ").";
+        header('Location: scrolltab.php?suchsachnr=' . urlencode($params_for_sql['sachnr']));
+        exit;
+
+    } elseif ($action === 'Datensatz löschen' && $id && ctype_digit((string)$id)) {
+        if(!$can_edit_master_data) {
+             $_SESSION['error_message'] = "Keine Berechtigung zum Löschen.";
+             header('Location: scrolltab.php');
+             exit;
+        }
+        $stmt_delete = $pdo->prepare("DELETE FROM zeichnverw WHERE id = :id");
+        $stmt_delete->execute(['id' => $id]);
+        log_action($pdo, 'DELETE_RECORD', (int)$id, 'zeichnverw', ['deleted_id' => $id]);
+        $_SESSION['success_message'] = "Datensatz (ID: " . htmlspecialchars($id) . ") erfolgreich gelöscht.";
         header('Location: scrolltab.php?suchsachnr=' . urlencode($suchsachnr_return));
+        exit;
+
+    } else {
+        $_SESSION['error_message'] = "Unbekannte oder ungültige Aktion.";
+        header('Location: scrolltab.php');
+        exit;
     }
+
+} catch (PDOException $e) {
+    error_log("Database operation error in ds_speich.php: " . $e->getMessage());
+    try {
+        log_action($pdo, 'DB_ERROR', ($id ?? null), 'zeichnverw', ['error_code' => $e->getCode(), 'error_message' => $e->getMessage(), 'action' => $action]);
+    } catch (PDOException $log_e) {
+        error_log("Failed to write to action_log: " . $log_e->getMessage());
+    }
+    $_SESSION['error_message'] = "Ein Datenbankfehler ist aufgetreten. Details wurden im Server-Log protokolliert.";
+    header('Location: scrolltab.php?suchsachnr=' . urlencode($suchsachnr_return));
     exit;
 }
+?>

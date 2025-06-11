@@ -17,7 +17,10 @@ $department_options = [
     'PP' => 'PP',
     'PG' => 'PG',
     'PF' => 'PF',
-    'PV' => 'PV'
+    'PV' => 'PV',
+    'VS' => 'VS', // NEU
+    'EK' => 'EK',  // NEU
+    'Q' => 'Q'
     // Fügen Sie hier bei Bedarf weitere Abteilungen hinzu
 ];
 

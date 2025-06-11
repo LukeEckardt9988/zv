@@ -223,3 +223,12 @@ tr.status-record-not-received td {
 #index_status_new_1{
   display: none;
 }
+
+
+/* custom_styles.css */
+.app-header-startseite-link a i {
+  transition: color 0.2s ease-in-out;
+}
+.app-header-startseite-link a:hover i {
+  color: var(--app-secondary-accent-color) !important; /* Farbe beim Hovern, z.B. Ihre Sekundär-Akzentfarbe */
+}

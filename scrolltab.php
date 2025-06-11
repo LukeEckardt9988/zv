@@ -52,11 +52,11 @@ $index_options_list = [
     '142' => '142 - PG',
     '145' => '145 - PP',
     '146' => '146 - PF',
-    '600' => '600 - Einkauf',
+    '600' => '600 - EK',
     '241' => '241 - PP',
     '152' => '152 - PG',
     '153' => '153 - PG',
-    '154' => '154 - Versand',
+    '154' => '154 - VS',
     '300' => '300 - Technologie'
 ];
 
@@ -110,9 +110,16 @@ $kurz_options_list = [
 <body>
     <header class="app-header">
         <div class="logo-left"><img src="EPSa_logo_group_diap.svg" alt="EPSa Logo"></div>
-        <h1 class="app-title"><?php echo htmlspecialchars(APP_TITLE); ?></h1>
-        <div class="user-info">
-            Angemeldet als: <strong><?php echo htmlspecialchars($_SESSION['username']); ?></strong>
+        <h1 class="app-title">
+            <?php echo htmlspecialchars(APP_TITLE); // Der Titel ist jetzt nicht mehr der Link 
+            ?>
+        </h1>
+        <div class="user-info d-flex align-items-center"> 
+            <a href="index.php" title="Zur Startseite" class="text-light me-3">
+                <i class="bi bi-house-door-fill" style="font-size: 1.7rem; vertical-align: middle;"></i> 
+            </a>
+            <span>Angemeldet als: </span>
+            <strong style="margin-left: 0.3rem; margin-right: 0.75rem;"><?php echo htmlspecialchars($_SESSION['username']); ?></strong>
             <a href="logout.php">Logout</a>
         </div>
         <div class="logo-right"><img src="SeroEMSgroup_Logo_vc_DIAP.svg" alt="SeroEMS Logo"></div>
@@ -240,8 +247,8 @@ $kurz_options_list = [
                                     <div class="form-check ms-2">
                                         <!-- Ich habe die Echeckboxen versteckt.. damit automatisch 0 gespeichert wird.. ist nicht schön aber funktioniert. -->
                                         <input type="hidden" name="dynamic_indices_status[0]" value="0">
-                                        <input  class="form-check-input index-status-checkbox hiddencheckbox" type="checkbox" name="dynamic_indices_status[0]" value="1"  id="index_status_new_0">
-                                        <label  class="form-check-label small" id="index_status_new_1" for="index_status_new_0">erhalten</label>
+                                        <input class="form-check-input index-status-checkbox hiddencheckbox" type="checkbox" name="dynamic_indices_status[0]" value="1" id="index_status_new_0">
+                                        <label class="form-check-label small" id="index_status_new_1" for="index_status_new_0">erhalten</label>
                                     </div>
                                     <button type="button" class="btn btn-danger btn-sm remove-index-btn ms-2" style="display: none;">-</button>
                                 </div>
