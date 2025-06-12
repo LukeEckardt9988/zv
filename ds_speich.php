@@ -213,6 +213,34 @@ try {
 
         header('Location: scrolltab.php?suchsachnr=' . urlencode($suchsachnr_return));
         exit;
+
+        // --- START: NEUE LOGIK FÜR ENDGÜLTIGES LÖSCHEN ---
+    } elseif ($action === 'endgueltig_loeschen' && $id && ctype_digit((string)$id)) {
+        // Erneute Berechtigungsprüfung zur Sicherheit
+        if (!$can_edit_master_data) {
+            $_SESSION['error_message'] = "Keine Berechtigung zum endgültigen Löschen.";
+            header('Location: scrolltab.php');
+            exit;
+        }
+
+        // Hole den Datensatz für das finale Log
+        $stmt_old = $pdo->prepare("SELECT * FROM zeichnverw WHERE id = :id");
+        $stmt_old->execute(['id' => $id]);
+        $record_to_delete = $stmt_old->fetch(PDO::FETCH_ASSOC);
+
+        // Führe den finalen DELETE-Befehl aus
+        $stmt_delete = $pdo->prepare("DELETE FROM zeichnverw WHERE id = :id");
+        $stmt_delete->execute(['id' => $id]);
+
+        // Logge die permanente Löschung
+        if ($record_to_delete) {
+            log_action($pdo, 'RECORD_HARD_DELETED', (int)$id, 'zeichnverw', $record_to_delete);
+        }
+
+        $_SESSION['success_message'] = "Datensatz (ID: " . htmlspecialchars($id) . ") wurde endgültig gelöscht.";
+        header('Location: scrolltab.php?suchsachnr=' . urlencode($suchsachnr_return));
+        exit;
+        // --- ENDE: NEUE LOGIK ---
         // --- ENDE: NEUE "SOFT DELETE" LOGIK ---
     } else {
         $_SESSION['error_message'] = "Unbekannte oder ungültige Aktion.";

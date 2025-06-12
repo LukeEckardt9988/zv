@@ -388,47 +388,7 @@ try {
                         </div>
                     </form>
                 </section>
-                <div class="button-group ...">
-        <button type="button" class="btn btn-info me-2" data-bs-toggle="modal" data-bs-target="#logModal">
-            <i class="bi bi-clock-history"></i> Log-Verlauf anzeigen
-        </button>
-
-        <div class="modal fade" id="logModal" tabindex="-1" aria-labelledby="logModalLabel" aria-hidden="true">
-            <div class="modal-dialog modal-xl modal-dialog-scrollable">
-                <div class="modal-content">
-                    <div class="modal-header">
-                        <h5 class="modal-title" id="logModalLabel">Log-Verlauf für Datensatz ID: <?php echo htmlspecialchars($id_to_edit); ?></h5>
-                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                    </div>
-                    <div class="modal-body" id="logModalBody">
-                        Lade Logs...
-                    </div>
-                    <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Schließen</button>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <script>
-            document.addEventListener('DOMContentLoaded', function() {
-                const logModal = document.getElementById('logModal');
-                logModal.addEventListener('show.bs.modal', function() {
-                    const modalBody = document.getElementById('logModalBody');
-                    modalBody.innerHTML = '<div class="text-center"><div class="spinner-border" role="status"><span class="visually-hidden">Loading...</span></div></div>';
-
-                    fetch('get_logs.php?id=<?php echo $id_to_edit; ?>')
-                        .then(response => response.text())
-                        .then(data => {
-                            modalBody.innerHTML = data;
-                        })
-                        .catch(error => {
-                            modalBody.innerHTML = '<div class="alert alert-danger">Fehler beim Laden der Logs.</div>';
-                            console.error('Error:', error);
-                        });
-                });
-            });
-        </script>
+                
             <?php else: ?>
                 <div class="alert alert-warning">Der Datensatz konnte nicht geladen werden.</div>
             <?php endif; ?>

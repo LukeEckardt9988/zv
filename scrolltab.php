@@ -8,6 +8,15 @@ if (!isset($_SESSION['user_id'])) {
     exit;
 }
 
+// In scrolltab.php, nach `require_once 'db_connect.php';`
+
+// --- START: BERECHTIGUNGEN FÜR ANZEIGE LADEN ---
+$authorized_user_ids = [4, 10, 3]; // Ihre Admin-IDs aus der config.php
+$is_special_admin = isset($_SESSION['user_id']) && in_array($_SESSION['user_id'], $authorized_user_ids);
+$loggedInUserDept = strtoupper($_SESSION['user_department'] ?? '');
+$can_edit_master_data = ($loggedInUserDept === 'PV') || $is_special_admin;
+// --- ENDE: BERECHTIGUNGEN ---
+
 $aktueller_tag = date('d');
 $aktueller_monat = date('m');
 $aktuelles_jahr = date('Y');
@@ -116,9 +125,9 @@ $kurz_options_list = [
             <?php echo htmlspecialchars(APP_TITLE); // Der Titel ist jetzt nicht mehr der Link 
             ?>
         </h1>
-        <div class="user-info d-flex align-items-center"> 
+        <div class="user-info d-flex align-items-center">
             <a href="index.php" title="Zur Startseite" class="text-light me-3">
-                <i class="bi bi-house-door-fill" style="font-size: 1.7rem; vertical-align: middle;"></i> 
+                <i class="bi bi-house-door-fill" style="font-size: 1.7rem; vertical-align: middle;"></i>
             </a>
             <span>Angemeldet als: </span>
             <strong style="margin-left: 0.3rem; margin-right: 0.75rem;"><?php echo htmlspecialchars($_SESSION['username']); ?></strong>
@@ -288,217 +297,277 @@ $kurz_options_list = [
                 </form>
             </section>
 
+            <div class="button-group ...">
+                <button type="button" class="btn btn-info me-2" data-bs-toggle="modal" data-bs-target="#logModal">
+                    <i class="bi bi-clock-history"></i> Log-Verlauf anzeigen
+                </button>
 
-            <footer class="text-center text-body-secondary py-3">
-                <small>&copy; <?php echo date("Y"); ?> EPSa Alle Rechte vorbehalten.</small>
-            </footer>
+                <div class="modal fade" id="logModal" tabindex="-1" aria-labelledby="logModalLabel" aria-hidden="true">
+                    <div class="modal-dialog modal-xl modal-dialog-scrollable">
+                        <div class="modal-content">
+                            <div class="modal-header">
+                                <h5 class="modal-title" id="logModalLabel">Log-Verlauf</h5>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                            </div>
+                            <div class="modal-body" id="logModalBody">
+                                Lade Logs...
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Schließen</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
 
-            <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-            <script>
-                document.addEventListener('DOMContentLoaded', function() {
-                    // --- KURZ-FELDER LOGIK (unverändert von Ihrer Datei) ---
-                    const kurzContainer = document.getElementById('kurz_selectors_container');
-                    const addKurzButton = document.getElementById('add_kurz_btn');
-                    const hiddenCombinedKurzInput = document.getElementById('kurz_combined_hidden');
+                <script>
+                    document.addEventListener('DOMContentLoaded', function() {
+                        const logModal = document.getElementById('logModal');
+                        if (logModal) {
+                            // Dieses Event wird ausgelöst, sobald das Modal geöffnet wird
+                            logModal.addEventListener('show.bs.modal', function(event) {
 
-                    function updateCombinedKurzField() {
-                        if (!kurzContainer || !hiddenCombinedKurzInput) return; // Sicherstellen, dass Elemente existieren
-                        const selectedValues = [];
-                        kurzContainer.querySelectorAll('.kurz-select').forEach(function(select) {
-                            if (select.value) {
-                                selectedValues.push(select.value);
-                            }
-                        });
-                        hiddenCombinedKurzInput.value = selectedValues.join(' ');
-                        toggleKurzRemoveButtonVisibility();
-                    }
+                                // Finde den Button, der geklickt wurde, um das Modal zu öffnen
+                                const button = event.relatedTarget;
 
-                    function toggleKurzRemoveButtonVisibility() {
-                        if (!kurzContainer) return;
-                        const allKurzGroups = kurzContainer.querySelectorAll('.kurz-selector-group');
-                        allKurzGroups.forEach((group, idx) => {
-                            const removeBtn = group.querySelector('.remove-kurz-btn');
-                            if (removeBtn) {
-                                removeBtn.style.display = (allKurzGroups.length > 1) ? 'inline-block' : 'none';
-                            }
-                        });
-                    }
+                                // Hole die Datensatz-ID aus dem `data-id` Attribut des Buttons
+                                const recordId = button.getAttribute('data-id');
 
-                    if (kurzContainer && addKurzButton) {
-                        kurzContainer.addEventListener('change', function(event) {
-                            if (event.target.classList.contains('kurz-select')) {
-                                updateCombinedKurzField();
-                            }
-                        });
+                                const modalTitle = logModal.querySelector('.modal-title');
+                                const modalBody = logModal.querySelector('.modal-body');
 
-                        addKurzButton.addEventListener('click', function() {
-                            const firstKurzGroup = kurzContainer.querySelector('.kurz-selector-group');
-                            if (!firstKurzGroup) return;
+                                // Setze den Titel und lade die Logs
+                                modalTitle.textContent = 'Log-Verlauf für Datensatz ID: ' + recordId;
+                                modalBody.innerHTML = '<div class="text-center p-4"><div class="spinner-border" role="status"><span class="visually-hidden">Loading...</span></div></div>';
 
-                            const newKurzGroup = firstKurzGroup.cloneNode(true);
-                            newKurzGroup.querySelector('.kurz-select').value = '';
-
-                            const removeKurzBtn = newKurzGroup.querySelector('.remove-kurz-btn');
-                            if (removeKurzBtn) {
-                                removeKurzBtn.style.display = 'inline-block';
-                                removeKurzBtn.addEventListener('click', function() {
-                                    newKurzGroup.remove();
-                                    updateCombinedKurzField();
-                                });
-                            }
-                            kurzContainer.appendChild(newKurzGroup);
-                            updateCombinedKurzField();
-                        });
-                    }
-
-                    // Event Listener für initial vorhandene "Entfernen"-Buttons im Kurz-Bereich
-                    if (kurzContainer) {
-                        kurzContainer.querySelectorAll('.kurz-selector-group').forEach(group => {
-                            const removeBtn = group.querySelector('.remove-kurz-btn');
-                            if (removeBtn) {
-                                // Stellt sicher, dass der Listener nur einmal hinzugefügt wird, falls das Skript mehrmals läuft
-                                if (!removeBtn.dataset.listenerAttached) {
-                                    removeBtn.addEventListener('click', function() {
-                                        const allKurzGroups = kurzContainer.querySelectorAll('.kurz-selector-group');
-                                        if (allKurzGroups.length > 1) { // Nur entfernen, wenn es nicht die letzte Gruppe ist
-                                            group.remove();
-                                            updateCombinedKurzField();
+                                fetch('get_logs.php?id=' + recordId)
+                                    .then(response => {
+                                        if (!response.ok) {
+                                            throw new Error('Netzwerk-Antwort war nicht ok.');
                                         }
+                                        return response.text();
+                                    })
+                                    .then(data => {
+                                        modalBody.innerHTML = data;
+                                    })
+                                    .catch(error => {
+                                        modalBody.innerHTML = '<div class="alert alert-danger">Fehler beim Laden der Logs.</div>';
+                                        console.error('Error:', error);
                                     });
-                                    removeBtn.dataset.listenerAttached = 'true';
-                                }
-                            }
-                        });
-                    }
-                    updateCombinedKurzField(); // Initial aufrufen
-
-
-                    // --- INDIZES-FELDER LOGIK (aktualisiert) ---
-                    const indicesContainer = document.getElementById('indices_selectors_container');
-                    const addIndexButton = document.getElementById('add_index_btn');
-                    const MAX_INDICES = 7;
-
-                    function generateUniqueId(prefix = 'id_') {
-                        return prefix + Math.random().toString(36).substr(2, 9);
-                    }
-
-                    function applyIndexStyling(groupElement) {
-                        const select = groupElement.querySelector('.index-select');
-                        const checkbox = groupElement.querySelector('.index-status-checkbox');
-                        if (!select || !checkbox) return;
-
-                        if (select.value && select.value !== '' && !checkbox.checked) {
-                            select.classList.add('status-not-received');
-                            select.classList.remove('status-received');
-                        } else {
-                            select.classList.remove('status-not-received');
-                            select.classList.add('status-received');
-                        }
-                    }
-
-                    function updateIndexControls() {
-                        if (!indicesContainer) return;
-                        const allIndexGroups = indicesContainer.querySelectorAll('.index-selector-group');
-                        allIndexGroups.forEach((group) => {
-                            const removeBtn = group.querySelector('.remove-index-btn');
-                            if (removeBtn) {
-                                removeBtn.style.display = (allIndexGroups.length > 1) ? 'inline-block' : 'none';
-                            }
-                            applyIndexStyling(group); // Styling für jede Gruppe anwenden/prüfen
-                        });
-
-                        if (addIndexButton) {
-                            addIndexButton.disabled = (allIndexGroups.length >= MAX_INDICES);
-                            addIndexButton.classList.toggle('disabled', allIndexGroups.length >= MAX_INDICES);
-                        }
-                    }
-
-                    function addEventListenersToGroup(groupElement, key) {
-                        groupElement.querySelector('.index-select').name = `dynamic_indices[${key}]`;
-
-                        const hiddenStatus = groupElement.querySelector('input[type="hidden"]');
-                        if (hiddenStatus) hiddenStatus.name = `dynamic_indices_status[${key}]`;
-
-                        const checkbox = groupElement.querySelector('.index-status-checkbox');
-                        checkbox.name = `dynamic_indices_status[${key}]`;
-
-                        const label = groupElement.querySelector('.form-check-label');
-                        const newId = generateUniqueId('index_status_' + key + '_');
-                        checkbox.id = newId;
-                        label.setAttribute('for', newId);
-
-                        checkbox.addEventListener('change', function() {
-                            applyIndexStyling(groupElement);
-                        });
-                        groupElement.querySelector('.index-select').addEventListener('change', function() {
-                            applyIndexStyling(groupElement);
-                        });
-
-                        const removeBtn = groupElement.querySelector('.remove-index-btn');
-                        if (removeBtn) {
-                            removeBtn.addEventListener('click', function() {
-                                groupElement.remove();
-                                updateIndexControls();
                             });
                         }
-                    }
+                    });
+                </script>
 
+                <footer class="text-center text-body-secondary py-3">
+                    <small>&copy; <?php echo date("Y"); ?> EPSa Alle Rechte vorbehalten.</small>
+                </footer>
 
-                    if (addIndexButton && indicesContainer) {
-                        addIndexButton.addEventListener('click', function() {
-                            const allIndexGroups = indicesContainer.querySelectorAll('.index-selector-group');
-                            if (allIndexGroups.length < MAX_INDICES) {
-                                const templateNode = indicesContainer.querySelector('.index-selector-group');
-                                if (!templateNode) {
-                                    console.error("Index template node not found!");
-                                    return;
+                <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+                <script>
+                    document.addEventListener('DOMContentLoaded', function() {
+                        // --- KURZ-FELDER LOGIK (unverändert von Ihrer Datei) ---
+                        const kurzContainer = document.getElementById('kurz_selectors_container');
+                        const addKurzButton = document.getElementById('add_kurz_btn');
+                        const hiddenCombinedKurzInput = document.getElementById('kurz_combined_hidden');
+
+                        function updateCombinedKurzField() {
+                            if (!kurzContainer || !hiddenCombinedKurzInput) return; // Sicherstellen, dass Elemente existieren
+                            const selectedValues = [];
+                            kurzContainer.querySelectorAll('.kurz-select').forEach(function(select) {
+                                if (select.value) {
+                                    selectedValues.push(select.value);
                                 }
-                                const newIndexGroup = templateNode.cloneNode(true);
+                            });
+                            hiddenCombinedKurzInput.value = selectedValues.join(' ');
+                            toggleKurzRemoveButtonVisibility();
+                        }
 
-                                // Den nächsten freien numerischen Schlüssel für die Namen finden
-                                let newIndexKey = 0;
-                                const existingKeys = new Set();
-                                indicesContainer.querySelectorAll('.index-select').forEach(sel => {
-                                    const match = sel.name.match(/\[(\d+)\]/);
-                                    if (match) existingKeys.add(parseInt(match[1]));
-                                });
-                                while (existingKeys.has(newIndexKey)) {
-                                    newIndexKey++;
+                        function toggleKurzRemoveButtonVisibility() {
+                            if (!kurzContainer) return;
+                            const allKurzGroups = kurzContainer.querySelectorAll('.kurz-selector-group');
+                            allKurzGroups.forEach((group, idx) => {
+                                const removeBtn = group.querySelector('.remove-kurz-btn');
+                                if (removeBtn) {
+                                    removeBtn.style.display = (allKurzGroups.length > 1) ? 'inline-block' : 'none';
                                 }
+                            });
+                        }
 
-                                // Namen und IDs für geklonte Elemente setzen
-                                newIndexGroup.querySelector('.index-select').value = '';
-                                newIndexGroup.querySelector('.index-status-checkbox').checked = false;
+                        if (kurzContainer && addKurzButton) {
+                            kurzContainer.addEventListener('change', function(event) {
+                                if (event.target.classList.contains('kurz-select')) {
+                                    updateCombinedKurzField();
+                                }
+                            });
 
-                                addEventListenersToGroup(newIndexGroup, newIndexKey); // Setzt Namen und Listener
+                            addKurzButton.addEventListener('click', function() {
+                                const firstKurzGroup = kurzContainer.querySelector('.kurz-selector-group');
+                                if (!firstKurzGroup) return;
 
-                                indicesContainer.appendChild(newIndexGroup);
-                                applyIndexStyling(newIndexGroup); // Initiales Styling für die neue Gruppe
-                                updateIndexControls();
+                                const newKurzGroup = firstKurzGroup.cloneNode(true);
+                                newKurzGroup.querySelector('.kurz-select').value = '';
+
+                                const removeKurzBtn = newKurzGroup.querySelector('.remove-kurz-btn');
+                                if (removeKurzBtn) {
+                                    removeKurzBtn.style.display = 'inline-block';
+                                    removeKurzBtn.addEventListener('click', function() {
+                                        newKurzGroup.remove();
+                                        updateCombinedKurzField();
+                                    });
+                                }
+                                kurzContainer.appendChild(newKurzGroup);
+                                updateCombinedKurzField();
+                            });
+                        }
+
+                        // Event Listener für initial vorhandene "Entfernen"-Buttons im Kurz-Bereich
+                        if (kurzContainer) {
+                            kurzContainer.querySelectorAll('.kurz-selector-group').forEach(group => {
+                                const removeBtn = group.querySelector('.remove-kurz-btn');
+                                if (removeBtn) {
+                                    // Stellt sicher, dass der Listener nur einmal hinzugefügt wird, falls das Skript mehrmals läuft
+                                    if (!removeBtn.dataset.listenerAttached) {
+                                        removeBtn.addEventListener('click', function() {
+                                            const allKurzGroups = kurzContainer.querySelectorAll('.kurz-selector-group');
+                                            if (allKurzGroups.length > 1) { // Nur entfernen, wenn es nicht die letzte Gruppe ist
+                                                group.remove();
+                                                updateCombinedKurzField();
+                                            }
+                                        });
+                                        removeBtn.dataset.listenerAttached = 'true';
+                                    }
+                                }
+                            });
+                        }
+                        updateCombinedKurzField(); // Initial aufrufen
+
+
+                        // --- INDIZES-FELDER LOGIK (aktualisiert) ---
+                        const indicesContainer = document.getElementById('indices_selectors_container');
+                        const addIndexButton = document.getElementById('add_index_btn');
+                        const MAX_INDICES = 7;
+
+                        function generateUniqueId(prefix = 'id_') {
+                            return prefix + Math.random().toString(36).substr(2, 9);
+                        }
+
+                        function applyIndexStyling(groupElement) {
+                            const select = groupElement.querySelector('.index-select');
+                            const checkbox = groupElement.querySelector('.index-status-checkbox');
+                            if (!select || !checkbox) return;
+
+                            if (select.value && select.value !== '' && !checkbox.checked) {
+                                select.classList.add('status-not-received');
+                                select.classList.remove('status-received');
+                            } else {
+                                select.classList.remove('status-not-received');
+                                select.classList.add('status-received');
                             }
-                        });
-                    }
+                        }
 
-                    // Initial Event Listeners und Styling für PHP-gerenderte Elemente (besonders in ds_aend.php)
-                    if (indicesContainer) {
-                        indicesContainer.querySelectorAll('.index-selector-group').forEach((group, key) => {
-                            // Stellt sicher, dass die von PHP generierten Namen korrekt indiziert sind (falls nicht schon geschehen)
-                            // Dies ist eher eine Aufgabe für das PHP-Rendering, aber JS kann es hier korrigieren/sicherstellen.
-                            const select = group.querySelector('.index-select');
-                            const hiddenStatus = group.querySelector('input[type="hidden"]');
-                            const checkbox = group.querySelector('.index-status-checkbox');
+                        function updateIndexControls() {
+                            if (!indicesContainer) return;
+                            const allIndexGroups = indicesContainer.querySelectorAll('.index-selector-group');
+                            allIndexGroups.forEach((group) => {
+                                const removeBtn = group.querySelector('.remove-index-btn');
+                                if (removeBtn) {
+                                    removeBtn.style.display = (allIndexGroups.length > 1) ? 'inline-block' : 'none';
+                                }
+                                applyIndexStyling(group); // Styling für jede Gruppe anwenden/prüfen
+                            });
 
-                            if (select && select.name.endsWith("[]")) select.name = `dynamic_indices[${key}]`;
-                            if (hiddenStatus && hiddenStatus.name.endsWith("[]")) hiddenStatus.name = `dynamic_indices_status[${key}]`;
-                            if (checkbox && checkbox.name.endsWith("[]")) checkbox.name = `dynamic_indices_status[${key}]`;
+                            if (addIndexButton) {
+                                addIndexButton.disabled = (allIndexGroups.length >= MAX_INDICES);
+                                addIndexButton.classList.toggle('disabled', allIndexGroups.length >= MAX_INDICES);
+                            }
+                        }
 
-                            addEventListenersToGroup(group, key); // Fügt Listener hinzu und setzt Namen falls noch nötig
-                            applyIndexStyling(group);
-                        });
-                        updateIndexControls();
-                    }
-                });
-            </script>
+                        function addEventListenersToGroup(groupElement, key) {
+                            groupElement.querySelector('.index-select').name = `dynamic_indices[${key}]`;
+
+                            const hiddenStatus = groupElement.querySelector('input[type="hidden"]');
+                            if (hiddenStatus) hiddenStatus.name = `dynamic_indices_status[${key}]`;
+
+                            const checkbox = groupElement.querySelector('.index-status-checkbox');
+                            checkbox.name = `dynamic_indices_status[${key}]`;
+
+                            const label = groupElement.querySelector('.form-check-label');
+                            const newId = generateUniqueId('index_status_' + key + '_');
+                            checkbox.id = newId;
+                            label.setAttribute('for', newId);
+
+                            checkbox.addEventListener('change', function() {
+                                applyIndexStyling(groupElement);
+                            });
+                            groupElement.querySelector('.index-select').addEventListener('change', function() {
+                                applyIndexStyling(groupElement);
+                            });
+
+                            const removeBtn = groupElement.querySelector('.remove-index-btn');
+                            if (removeBtn) {
+                                removeBtn.addEventListener('click', function() {
+                                    groupElement.remove();
+                                    updateIndexControls();
+                                });
+                            }
+                        }
+
+
+                        if (addIndexButton && indicesContainer) {
+                            addIndexButton.addEventListener('click', function() {
+                                const allIndexGroups = indicesContainer.querySelectorAll('.index-selector-group');
+                                if (allIndexGroups.length < MAX_INDICES) {
+                                    const templateNode = indicesContainer.querySelector('.index-selector-group');
+                                    if (!templateNode) {
+                                        console.error("Index template node not found!");
+                                        return;
+                                    }
+                                    const newIndexGroup = templateNode.cloneNode(true);
+
+                                    // Den nächsten freien numerischen Schlüssel für die Namen finden
+                                    let newIndexKey = 0;
+                                    const existingKeys = new Set();
+                                    indicesContainer.querySelectorAll('.index-select').forEach(sel => {
+                                        const match = sel.name.match(/\[(\d+)\]/);
+                                        if (match) existingKeys.add(parseInt(match[1]));
+                                    });
+                                    while (existingKeys.has(newIndexKey)) {
+                                        newIndexKey++;
+                                    }
+
+                                    // Namen und IDs für geklonte Elemente setzen
+                                    newIndexGroup.querySelector('.index-select').value = '';
+                                    newIndexGroup.querySelector('.index-status-checkbox').checked = false;
+
+                                    addEventListenersToGroup(newIndexGroup, newIndexKey); // Setzt Namen und Listener
+
+                                    indicesContainer.appendChild(newIndexGroup);
+                                    applyIndexStyling(newIndexGroup); // Initiales Styling für die neue Gruppe
+                                    updateIndexControls();
+                                }
+                            });
+                        }
+
+                        // Initial Event Listeners und Styling für PHP-gerenderte Elemente (besonders in ds_aend.php)
+                        if (indicesContainer) {
+                            indicesContainer.querySelectorAll('.index-selector-group').forEach((group, key) => {
+                                // Stellt sicher, dass die von PHP generierten Namen korrekt indiziert sind (falls nicht schon geschehen)
+                                // Dies ist eher eine Aufgabe für das PHP-Rendering, aber JS kann es hier korrigieren/sicherstellen.
+                                const select = group.querySelector('.index-select');
+                                const hiddenStatus = group.querySelector('input[type="hidden"]');
+                                const checkbox = group.querySelector('.index-status-checkbox');
+
+                                if (select && select.name.endsWith("[]")) select.name = `dynamic_indices[${key}]`;
+                                if (hiddenStatus && hiddenStatus.name.endsWith("[]")) hiddenStatus.name = `dynamic_indices_status[${key}]`;
+                                if (checkbox && checkbox.name.endsWith("[]")) checkbox.name = `dynamic_indices_status[${key}]`;
+
+                                addEventListenersToGroup(group, key); // Fügt Listener hinzu und setzt Namen falls noch nötig
+                                applyIndexStyling(group);
+                            });
+                            updateIndexControls();
+                        }
+                    });
+                </script>
 </body>
 
 </html>
