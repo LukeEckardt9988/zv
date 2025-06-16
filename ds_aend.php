@@ -14,6 +14,18 @@ if (!isset($_SESSION['user_id'])) {
 $authorized_user_ids = [4, 10, 3]; // Ihre Admin-IDs
 $is_special_admin = isset($_SESSION['user_id']) && in_array($_SESSION['user_id'], $authorized_user_ids);
 
+// --- START: READONLY-STATUS DEFINIEREN ---
+// Legt fest, ob die Formularfelder schreibgeschützt sein sollen.
+// Wenn der User weder Stammdaten bearbeiten darf noch ein spezieller Admin ist,
+// werden die Felder auf "readonly" gesetzt.
+if ($can_edit_master_data || $is_special_admin) {
+    $is_read_only = ''; // Leerer String, Feld ist bearbeitbar
+} else {
+    $is_read_only = 'readonly'; // 'readonly'-Attribut, Feld ist gesperrt
+}
+// --- ENDE: READONLY-STATUS DEFINIEREN ---
+
+
 // 2. Das "Wörterbuch", das Kürzel auf Namen übersetzt
 $department_map = [
     'PP' => 'PP',
@@ -353,21 +365,13 @@ try {
                             </div>
                             <div class="col-md-5">
                                 <label class="form-label d-block mb-1">Datum:</label>
-                                <div class="d-flex align-items-center">
+                                <div class="form-group col-md-3">
+                                    <label for="dat">Datum</label>
                                     <?php
-                                    $date_obj = null;
-                                    if ($record['dat'] && $record['dat'] !== '0000-00-00') {
-                                        try {
-                                            $date_obj = new DateTime($record['dat']);
-                                        } catch (Exception $e) {
-                                        }
-                                    }
+                                    // Das Datum aus dem Datensatz holen und formatieren
+                                    $display_date = !empty($record['dat']) ? htmlspecialchars(date('Y-m-d', strtotime($record['dat']))) : '';
                                     ?>
-                                    <input name="t_dat_display" type="text" class="form-control form-control-sm" placeholder="TT" style="width: 65px;" value="<?php echo $date_obj ? $date_obj->format('d') : ''; ?>" readonly>
-                                    <span class="ps-1 pe-1 text-center">.</span>
-                                    <input name="m_dat_display" type="text" class="form-control form-control-sm" placeholder="MM" style="width: 65px;" value="<?php echo $date_obj ? $date_obj->format('m') : ''; ?>" readonly>
-                                    <span class="ps-1 pe-1 text-center">.</span>
-                                    <input name="y_dat_display" type="text" class="form-control form-control-sm" placeholder="JJJJ" style="width: 85px;" value="<?php echo $date_obj ? $date_obj->format('Y') : ''; ?>" readonly>
+                                    <input type="date" id="dat" name="dat" class="form-control" value="<?php echo $display_date; ?>" <?php echo $is_read_only; ?>>
                                 </div>
                             </div>
                         </div>
@@ -375,39 +379,39 @@ try {
                         <div class="row gx-2 mb-3">
                             <div class="col-12">
                                 <label for="hinw_edit" class="form-label">Hinweis:</label>
-                                <input id="hinw_edit" name="hinw" type="text" class="form-control form-control-sm" value="<?php echo htmlspecialchars($record['hinw']); ?>" maxlength="50" <?php if (!$can_edit_master_data) echo 'readonly'; ?>>
+                                <input id="hinw_edit" name="hinw" type="text" class="form-control form-control-sm" value="<?php echo htmlspecialchars($record['hinw']); ?>" maxlength="255" <?php if (!$can_edit_master_data) echo 'readonly'; ?>>
                             </div>
                         </div>
 
                         <div class="mt-4 d-flex gap-2">
                             <button type="submit" class="btn btn-success"><i class="bi bi-save"></i> Änderungen speichern</button>
                             <?php if ($can_edit_master_data): ?>
-                              <button type="submit" class="btn btn-warning" name="action" value="Zeichnung entfernen" onclick="return confirm('Soll diese Zeichnung wirklich entfernt und archiviert werden? Der Datensatz bleibt erhalten.')"><i class="bi bi-archive"></i> Zeichnung entfernen</button>
+                                <button type="submit" class="btn btn-warning" name="action" value="Zeichnung entfernen" onclick="return confirm('Soll diese Zeichnung wirklich entfernt und archiviert werden? Der Datensatz bleibt erhalten.')"><i class="bi bi-archive"></i> Zeichnung entfernen</button>
                             <?php endif; ?>
                             <a href="scrolltab.php?suchsachnr=<?php echo htmlspecialchars($suchsachnr_param); ?>" class="btn btn-secondary"><i class="bi bi-x-circle"></i> Abbrechen</a>
                         </div>
                     </form>
                 </section>
-                
+
             <?php else: ?>
                 <div class="alert alert-warning">Der Datensatz konnte nicht geladen werden.</div>
             <?php endif; ?>
         </div>
     </div>
 
-    
 
-        <footer class="text-center text-body-secondary py-3 mt-3">
-            <small>&copy; <?php echo date("Y"); ?> Ihre Firma. Alle Rechte vorbehalten.</small>
-        </footer>
 
-        <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-        <script>
-            // Ihr JavaScript zur Steuerung der dynamischen Felder "Kurz" und "Indizes"
-            document.addEventListener('DOMContentLoaded', function() {
-                // ... (Hier würde der JavaScript-Code stehen, der die "+"- und "-"-Buttons steuert)
-            });
-        </script>
+    <footer class="text-center text-body-secondary py-3 mt-3">
+        <small>&copy; <?php echo date("Y"); ?> Ihre Firma. Alle Rechte vorbehalten.</small>
+    </footer>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // Ihr JavaScript zur Steuerung der dynamischen Felder "Kurz" und "Indizes"
+        document.addEventListener('DOMContentLoaded', function() {
+            // ... (Hier würde der JavaScript-Code stehen, der die "+"- und "-"-Buttons steuert)
+        });
+    </script>
 </body>
 
 </html>
